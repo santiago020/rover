@@ -1154,6 +1154,15 @@ function handleIncoming(raw){
   if(fields.ESP32M!==undefined) $('infoEsp32M').textContent = fields.ESP32M;
   if(fields.ESP32S!==undefined) $('infoEsp32S').textContent = fields.ESP32S;
   if(fields.ESTADO!==undefined){ state.roverState=fields.ESTADO; $('valRoverState').textContent = fields.ESTADO; }
+  if(fields.MODO!==undefined){
+    const m = fields.MODO.trim().toUpperCase();
+    if(m === 'AUTO' || m === 'MANUAL'){
+      state.mode = m;
+      $('btnAuto').classList.toggle('active', m==='AUTO');
+      $('btnManual').classList.toggle('active', m==='MANUAL');
+      $('modeIndicator').textContent = m;
+    }
+  }
 
   $('heroActive').textContent = `${state.activeIds.size}/${REPORTING_TOTAL}`;
   $('historyCount').textContent = Object.values(state.history).reduce((a,h)=>a+h.length,0) + ' registros';
@@ -1586,6 +1595,7 @@ function generateSyntheticTelemetry(){
   parts.push(`ESP32M=OK`);
   parts.push(`ESP32S=OK`);
   parts.push(`ESTADO=${state.heldDir || 'DETENIDO'}`);
+  parts.push(`MODO=${state.mode || 'MANUAL'}`);
 
   const payloadNoCrc = parts.join('|');
   const crc = computeChecksum(payloadNoCrc);
