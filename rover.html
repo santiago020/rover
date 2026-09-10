@@ -10,8 +10,8 @@
 <title>ROVER // Estación de control</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.15.2/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -666,6 +666,7 @@ function loadConfig(){
 
 let cfg = loadConfig();
 const $ = id => document.getElementById(id);
+let isDemoMode = false;
 
 function applyConfigToUI(){
   $('topicComandoVal').textContent = cfg.topicComando;
@@ -888,30 +889,35 @@ $('btnExportCsv').addEventListener('click', exportCSV);
 /* ============================================================
    CHART.JS SETUP
 ============================================================ */
-Chart.defaults.color = '#7c8798';
-Chart.defaults.font.family = "'JetBrains Mono', monospace";
-Chart.defaults.font.size = 10.5;
+let mainChart = null;
+let imuChart = null;
 
-const chartBaseOpts = {
-  animation:false, responsive:true, maintainAspectRatio:false, parsing:false,
-  normalized:true,
-  interaction:{ intersect:false, mode:'nearest' },
-  scales:{
-    x:{ type:'linear', grid:{ color:'#1b222c' }, ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:7, callback:(v)=> new Date(v).toLocaleTimeString('es-CO',{hour12:false}) } },
-    y:{ grid:{ color:'#1b222c' } }
-  },
-  plugins:{
-    legend:{ labels:{ boxWidth:9, boxHeight:9, usePointStyle:true } },
-    decimation:{ enabled:true, algorithm:'lttb', samples:120 }
-  }
-};
+if(typeof Chart !== 'undefined'){
+  Chart.defaults.color = '#7c8798';
+  Chart.defaults.font.family = "'JetBrains Mono', monospace";
+  Chart.defaults.font.size = 10.5;
 
-const mainChart = new Chart($('mainChart'), { type:'line', data:{datasets:[]}, options: chartBaseOpts });
-const imuChart = new Chart($('imuChart'), { type:'line', data:{ datasets:[
-  {label:'X', data:[], borderColor:'#ff5f6d', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
-  {label:'Y', data:[], borderColor:'#3ddbd9', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
-  {label:'Z', data:[], borderColor:'#ffb020', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
-]}, options: chartBaseOpts });
+  const chartBaseOpts = {
+    animation:false, responsive:true, maintainAspectRatio:false, parsing:false,
+    normalized:true,
+    interaction:{ intersect:false, mode:'nearest' },
+    scales:{
+      x:{ type:'linear', grid:{ color:'#1b222c' }, ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:7, callback:(v)=> new Date(v).toLocaleTimeString('es-CO',{hour12:false}) } },
+      y:{ grid:{ color:'#1b222c' } }
+    },
+    plugins:{
+      legend:{ labels:{ boxWidth:9, boxHeight:9, usePointStyle:true } },
+      decimation:{ enabled:true, algorithm:'lttb', samples:120 }
+    }
+  };
+
+  mainChart = new Chart($('mainChart'), { type:'line', data:{datasets:[]}, options: chartBaseOpts });
+  imuChart = new Chart($('imuChart'), { type:'line', data:{ datasets:[
+    {label:'X', data:[], borderColor:'#ff5f6d', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
+    {label:'Y', data:[], borderColor:'#3ddbd9', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
+    {label:'Z', data:[], borderColor:'#ffb020', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
+  ]}, options: chartBaseOpts });
+}
 
 const PALETTE = ['#3ddbd9','#ffb020','#ff5f6d','#39d97e','#9b8cff','#ff8fd6','#7ad4ff','#ffe07a'];
 
@@ -921,6 +927,7 @@ function seriesFor(id){
 }
 
 function redrawMainChart(){
+  if(!mainChart) return;
   const sel = chartSelect.value;
   let ids = [];
   if(sel==='ALL_C') ids = CORRIENTES.map(s=>s.id);
@@ -938,6 +945,7 @@ function redrawMainChart(){
 }
 
 function redrawImuChart(){
+  if(!imuChart) return;
   imuChart.data.datasets[0].data = seriesFor('IMUX');
   imuChart.data.datasets[1].data = seriesFor('IMUY');
   imuChart.data.datasets[2].data = seriesFor('IMUZ');
@@ -1521,7 +1529,6 @@ function exportCSV(){
    SIMULADOR / MODO DEMO
 ============================================================ */
 let demoInterval = null;
-let isDemoMode = false;
 let simBattery = 12.45;
 let simAngle = 45;
 
