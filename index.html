@@ -10,8 +10,8 @@
 <title>ROVER // Estación de control</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.15.2/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -666,6 +666,7 @@ function loadConfig(){
 
 let cfg = loadConfig();
 const $ = id => document.getElementById(id);
+let isDemoMode = false;
 
 function applyConfigToUI(){
   $('topicComandoVal').textContent = cfg.topicComando;
@@ -888,30 +889,35 @@ $('btnExportCsv').addEventListener('click', exportCSV);
 /* ============================================================
    CHART.JS SETUP
 ============================================================ */
-Chart.defaults.color = '#7c8798';
-Chart.defaults.font.family = "'JetBrains Mono', monospace";
-Chart.defaults.font.size = 10.5;
+let mainChart = null;
+let imuChart = null;
 
-const chartBaseOpts = {
-  animation:false, responsive:true, maintainAspectRatio:false, parsing:false,
-  normalized:true,
-  interaction:{ intersect:false, mode:'nearest' },
-  scales:{
-    x:{ type:'linear', grid:{ color:'#1b222c' }, ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:7, callback:(v)=> new Date(v).toLocaleTimeString('es-CO',{hour12:false}) } },
-    y:{ grid:{ color:'#1b222c' } }
-  },
-  plugins:{
-    legend:{ labels:{ boxWidth:9, boxHeight:9, usePointStyle:true } },
-    decimation:{ enabled:true, algorithm:'lttb', samples:120 }
-  }
-};
+if(typeof Chart !== 'undefined'){
+  Chart.defaults.color = '#7c8798';
+  Chart.defaults.font.family = "'JetBrains Mono', monospace";
+  Chart.defaults.font.size = 10.5;
 
-const mainChart = new Chart($('mainChart'), { type:'line', data:{datasets:[]}, options: chartBaseOpts });
-const imuChart = new Chart($('imuChart'), { type:'line', data:{ datasets:[
-  {label:'X', data:[], borderColor:'#ff5f6d', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
-  {label:'Y', data:[], borderColor:'#3ddbd9', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
-  {label:'Z', data:[], borderColor:'#ffb020', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
-]}, options: chartBaseOpts });
+  const chartBaseOpts = {
+    animation:false, responsive:true, maintainAspectRatio:false, parsing:false,
+    normalized:true,
+    interaction:{ intersect:false, mode:'nearest' },
+    scales:{
+      x:{ type:'linear', grid:{ color:'#1b222c' }, ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:7, callback:(v)=> new Date(v).toLocaleTimeString('es-CO',{hour12:false}) } },
+      y:{ grid:{ color:'#1b222c' } }
+    },
+    plugins:{
+      legend:{ labels:{ boxWidth:9, boxHeight:9, usePointStyle:true } },
+      decimation:{ enabled:true, algorithm:'lttb', samples:120 }
+    }
+  };
+
+  mainChart = new Chart($('mainChart'), { type:'line', data:{datasets:[]}, options: chartBaseOpts });
+  imuChart = new Chart($('imuChart'), { type:'line', data:{ datasets:[
+    {label:'X', data:[], borderColor:'#ff5f6d', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
+    {label:'Y', data:[], borderColor:'#3ddbd9', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
+    {label:'Z', data:[], borderColor:'#ffb020', backgroundColor:'transparent', borderWidth:1.6, pointRadius:0, tension:0.25},
+  ]}, options: chartBaseOpts });
+}
 
 const PALETTE = ['#3ddbd9','#ffb020','#ff5f6d','#39d97e','#9b8cff','#ff8fd6','#7ad4ff','#ffe07a'];
 
@@ -921,6 +927,7 @@ function seriesFor(id){
 }
 
 function redrawMainChart(){
+  if(!mainChart) return;
   const sel = chartSelect.value;
   let ids = [];
   if(sel==='ALL_C') ids = CORRIENTES.map(s=>s.id);
@@ -938,6 +945,7 @@ function redrawMainChart(){
 }
 
 function redrawImuChart(){
+  if(!imuChart) return;
   imuChart.data.datasets[0].data = seriesFor('IMUX');
   imuChart.data.datasets[1].data = seriesFor('IMUY');
   imuChart.data.datasets[2].data = seriesFor('IMUZ');
@@ -1263,29 +1271,15 @@ let client = null;
 
 function connectMqtt(){
   if(isDemoMode) return;
-
   addLog('sys','Conectando a broker MQTT...');
-
-  console.log('================================');
-  console.log('MQTT - INICIANDO CONEXION');
-  console.log('================================');
-  console.log('Broker:', cfg.broker);
-  console.log('Usuario:', cfg.user);
-  console.log('Topic sensores:', cfg.topicSensores);
-  console.log('Topic comandos:', cfg.topicComando);
-  console.log('Topic ACK:', cfg.topicAck);
-
-  const clientId = 'WEB_ROVER_' + Math.random().toString(16).substring(2);
-
+  const clientId = "WEB_ROVER_" + Math.random().toString(16).substring(2);
   client = mqtt.connect(cfg.broker, {
     clientId: clientId,
     username: cfg.user,
     password: cfg.pass,
-    protocol: 'wss',
     clean: true,
-    connectTimeout: 15000,
-    reconnectPeriod: 4000,
-    keepalive: 60
+    connectTimeout: 10000,
+    reconnectPeriod: 4000
   });
 
   client.on('connect', function(){
@@ -1293,40 +1287,14 @@ function connectMqtt(){
     state.connectedAt = state.connectedAt || Date.now();
     renderCommsStatus();
     addLog('conn','Conectado al broker MQTT');
-    showToast('MQTT conectado correctamente','ok');
-
-    client.subscribe(cfg.topicSensores, {qos:0}, function(err){
-      if(err){
-        console.error('ERROR SUSCRIBIENDO SENSORES:', err);
-        addLog('err','Error suscribiendo a '+cfg.topicSensores+': '+err.message);
-      }else{
-        console.log('Suscrito a:', cfg.topicSensores);
-        addLog('sys','Suscrito a '+cfg.topicSensores);
-      }
+    client.subscribe(cfg.topicSensores, function(err){
+      if(err) addLog('err','Error suscribiendo a '+cfg.topicSensores);
+      else addLog('sys','Suscrito a '+cfg.topicSensores);
     });
-
-    client.subscribe(cfg.topicAck, {qos:0}, function(err){
-      if(err){
-        console.error('ERROR SUSCRIBIENDO ACK:', err);
-        addLog('err','Error suscribiendo a '+cfg.topicAck+': '+err.message);
-      }else{
-        console.log('Suscrito a:', cfg.topicAck);
-        addLog('sys','Suscrito a '+cfg.topicAck);
-      }
+    client.subscribe(cfg.topicAck, function(err){
+      if(err) addLog('err','Error suscribiendo a '+cfg.topicAck);
+      else addLog('sys','Suscrito a '+cfg.topicAck);
     });
-  });
-
-  client.on('message', function(topic, message){
-    const texto = message.toString();
-
-    console.log('================================');
-    console.log('MQTT MENSAJE');
-    console.log('Topic:', topic);
-    console.log('Mensaje:', texto);
-    console.log('================================');
-
-    if(topic === cfg.topicAck) handleAck(texto);
-    else if(topic === cfg.topicSensores) handleIncoming(texto);
   });
 
   client.on('close', function(){
@@ -1335,27 +1303,11 @@ function connectMqtt(){
     renderAlerts();
     addLog('disc','MQTT desconectado');
   });
-
-  client.on('error', function(err){
-    console.error('================================');
-    console.error('ERROR MQTT');
-    console.error(err);
-    console.error('Mensaje:', err && err.message ? err.message : err);
-    console.error('================================');
-    state.mqttConnected = false;
-    renderCommsStatus();
-    addLog('err','Error MQTT: '+(err && err.message ? err.message : err));
-  });
-
-  client.on('reconnect', function(){
-    addLog('sys','Intentando reconectar...');
-    console.log('Intentando reconectar MQTT...');
-  });
-
-  client.on('offline', function(){
-    state.mqttConnected = false;
-    renderCommsStatus();
-    console.warn('Cliente MQTT offline');
+  client.on('error', function(err){ addLog('err','Error MQTT: '+err.message); });
+  client.on('reconnect', function(){ addLog('sys','Intentando reconectar...'); });
+  client.on('message', function(topic, message){
+    if(topic === cfg.topicAck) handleAck(message.toString());
+    else handleIncoming(message.toString());
   });
 }
 
@@ -1577,7 +1529,6 @@ function exportCSV(){
    SIMULADOR / MODO DEMO
 ============================================================ */
 let demoInterval = null;
-let isDemoMode = false;
 let simBattery = 12.45;
 let simAngle = 45;
 
