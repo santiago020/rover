@@ -1263,15 +1263,29 @@ let client = null;
 
 function connectMqtt(){
   if(isDemoMode) return;
+
   addLog('sys','Conectando a broker MQTT...');
-  const clientId = "WEB_ROVER_" + Math.random().toString(16).substring(2);
+
+  console.log('================================');
+  console.log('MQTT - INICIANDO CONEXION');
+  console.log('================================');
+  console.log('Broker:', cfg.broker);
+  console.log('Usuario:', cfg.user);
+  console.log('Topic sensores:', cfg.topicSensores);
+  console.log('Topic comandos:', cfg.topicComando);
+  console.log('Topic ACK:', cfg.topicAck);
+
+  const clientId = 'WEB_ROVER_' + Math.random().toString(16).substring(2);
+
   client = mqtt.connect(cfg.broker, {
     clientId: clientId,
     username: cfg.user,
     password: cfg.pass,
+    protocol: 'wss',
     clean: true,
-    connectTimeout: 10000,
-    reconnectPeriod: 4000
+    connectTimeout: 15000,
+    reconnectPeriod: 4000,
+    keepalive: 60
   });
 
   client.on('connect', function(){
@@ -1279,14 +1293,40 @@ function connectMqtt(){
     state.connectedAt = state.connectedAt || Date.now();
     renderCommsStatus();
     addLog('conn','Conectado al broker MQTT');
-    client.subscribe(cfg.topicSensores, function(err){
-      if(err) addLog('err','Error suscribiendo a '+cfg.topicSensores);
-      else addLog('sys','Suscrito a '+cfg.topicSensores);
+    showToast('MQTT conectado correctamente','ok');
+
+    client.subscribe(cfg.topicSensores, {qos:0}, function(err){
+      if(err){
+        console.error('ERROR SUSCRIBIENDO SENSORES:', err);
+        addLog('err','Error suscribiendo a '+cfg.topicSensores+': '+err.message);
+      }else{
+        console.log('Suscrito a:', cfg.topicSensores);
+        addLog('sys','Suscrito a '+cfg.topicSensores);
+      }
     });
-    client.subscribe(cfg.topicAck, function(err){
-      if(err) addLog('err','Error suscribiendo a '+cfg.topicAck);
-      else addLog('sys','Suscrito a '+cfg.topicAck);
+
+    client.subscribe(cfg.topicAck, {qos:0}, function(err){
+      if(err){
+        console.error('ERROR SUSCRIBIENDO ACK:', err);
+        addLog('err','Error suscribiendo a '+cfg.topicAck+': '+err.message);
+      }else{
+        console.log('Suscrito a:', cfg.topicAck);
+        addLog('sys','Suscrito a '+cfg.topicAck);
+      }
     });
+  });
+
+  client.on('message', function(topic, message){
+    const texto = message.toString();
+
+    console.log('================================');
+    console.log('MQTT MENSAJE');
+    console.log('Topic:', topic);
+    console.log('Mensaje:', texto);
+    console.log('================================');
+
+    if(topic === cfg.topicAck) handleAck(texto);
+    else if(topic === cfg.topicSensores) handleIncoming(texto);
   });
 
   client.on('close', function(){
@@ -1295,11 +1335,27 @@ function connectMqtt(){
     renderAlerts();
     addLog('disc','MQTT desconectado');
   });
-  client.on('error', function(err){ addLog('err','Error MQTT: '+err.message); });
-  client.on('reconnect', function(){ addLog('sys','Intentando reconectar...'); });
-  client.on('message', function(topic, message){
-    if(topic === cfg.topicAck) handleAck(message.toString());
-    else handleIncoming(message.toString());
+
+  client.on('error', function(err){
+    console.error('================================');
+    console.error('ERROR MQTT');
+    console.error(err);
+    console.error('Mensaje:', err && err.message ? err.message : err);
+    console.error('================================');
+    state.mqttConnected = false;
+    renderCommsStatus();
+    addLog('err','Error MQTT: '+(err && err.message ? err.message : err));
+  });
+
+  client.on('reconnect', function(){
+    addLog('sys','Intentando reconectar...');
+    console.log('Intentando reconectar MQTT...');
+  });
+
+  client.on('offline', function(){
+    state.mqttConnected = false;
+    renderCommsStatus();
+    console.warn('Cliente MQTT offline');
   });
 }
 
