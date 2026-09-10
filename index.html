@@ -154,17 +154,17 @@
 <script>
 
     // =====================================================
-    // CONFIGURACI”N MQTT
+    // CONFIGURACI√ìN MQTT
     // =====================================================
 
     /*
-       AQUÕ COLOCAREMOS EL SERVIDOR MQTT.
+       AQU√ç COLOCAREMOS EL SERVIDOR MQTT.
 
        Ejemplo:
 
        const BROKER = "wss://mi-servidor.com:8084/mqtt";
 
-       NO pongas todavÌa una IP local.
+       NO pongas todav√≠a una IP local.
     */
 
     const BROKER = "wss://TU_SERVIDOR_MQTT:PUERTO/mqtt";
@@ -176,7 +176,7 @@
 
 
     // =====================================================
-    // ELEMENTOS DE LA P¡GINA
+    // ELEMENTOS DE LA P√ÅGINA
     // =====================================================
 
     const estado = document.getElementById("estado");
@@ -185,7 +185,7 @@
 
 
     // =====================================================
-    // CONEXI”N MQTT
+    // CONEXI√ìN MQTT
     // =====================================================
 
     const cliente = mqtt.connect(BROKER, {
@@ -334,7 +334,7 @@
         if (!cliente.connected) {
 
             alert(
-                "No hay conexiÛn con MQTT"
+                "No hay conexi√≥n con MQTT"
             );
 
             return;
