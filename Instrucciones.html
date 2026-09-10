@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Monitoreo ESP32 - LoRa</title>
+
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0D1117;
+            color: #E6EDF3;
+        }
+
+        .contenedor {
+            max-width: 900px;
+            margin: auto;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #58A6FF;
+        }
+
+        .panel {
+            background: #161B22;
+            border: 1px solid #30363D;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .estado {
+            padding: 12px;
+            text-align: center;
+            border-radius: 5px;
+            background: #8B0000;
+        }
+
+        .estado.conectado {
+            background: #238636;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            box-sizing: border-box;
+            background: #0D1117;
+            color: #3FB950;
+            border: 1px solid #30363D;
+            border-radius: 5px;
+            padding: 12px;
+            font-family: Consolas, monospace;
+            resize: vertical;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            background: #0D1117;
+            color: white;
+            border: 1px solid #30363D;
+            border-radius: 5px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px;
+            background: #238636;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #2EA043;
+        }
+
+        #registro {
+            background: #0D1117;
+            border: 1px solid #30363D;
+            padding: 12px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="contenedor">
+
+    <h1>MONITOREO ESP32 + LoRa</h1>
+
+    <!-- ESTADO MQTT -->
+    <div id="estado" class="estado">
+        ?? MQTT DESCONECTADO
+    </div>
+
+
+    <!-- DATOS DEL MAESTRO -->
+    <div class="panel">
+
+        <h2>Datos recibidos</h2>
+
+        <textarea id="datos" readonly
+            placeholder="Esperando datos del ESP32 maestro..."></textarea>
+
+    </div>
+
+
+    <!-- COMANDOS -->
+    <div class="panel">
+
+        <h2>Enviar comando al maestro</h2>
+
+        <input
+            id="comando"
+            type="text"
+            placeholder="Escriba un comando..."
+        >
+
+        <button onclick="enviarComando()">
+            ENVIAR
+        </button>
+
+    </div>
+
+
+    <!-- REGISTRO -->
+    <div class="panel">
+
+        <h2>Registro</h2>
+
+        <div id="registro"></div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    // =====================================================
+    // CONFIGURACIÓN MQTT
+    // =====================================================
+
+    /*
+       AQUÍ COLOCAREMOS EL SERVIDOR MQTT.
+
+       Ejemplo:
+
+       const BROKER = "wss://mi-servidor.com:8084/mqtt";
+
+       NO pongas todavía una IP local.
+    */
+
+    const BROKER = "wss://TU_SERVIDOR_MQTT:PUERTO/mqtt";
+
+
+    // Topics
+    const TOPIC_DATOS = "robot/sensores";
+    const TOPIC_COMANDO = "robot/comando";
+
+
+    // =====================================================
+    // ELEMENTOS DE LA PÁGINA
+    // =====================================================
+
+    const estado = document.getElementById("estado");
+    const datos = document.getElementById("datos");
+    const registro = document.getElementById("registro");
+
+
+    // =====================================================
+    // CONEXIÓN MQTT
+    // =====================================================
+
+    const cliente = mqtt.connect(BROKER, {
+
+        clientId:
+            "pagina_web_" +
+            Math.random().toString(16).substring(2),
+
+        clean: true,
+
+        connectTimeout: 5000,
+
+        reconnectPeriod: 3000
+
+    });
+
+
+    // =====================================================
+    // MQTT CONECTADO
+    // =====================================================
+
+    cliente.on("connect", function() {
+
+        console.log("MQTT conectado");
+
+        estado.innerHTML = "?? MQTT CONECTADO";
+
+        estado.classList.add("conectado");
+
+        agregarRegistro("MQTT conectado");
+
+
+        // Suscribirse a los datos del maestro
+
+        cliente.subscribe(
+            TOPIC_DATOS,
+            function(error) {
+
+                if (error) {
+
+                    agregarRegistro(
+                        "? Error al suscribirse"
+                    );
+
+                } else {
+
+                    agregarRegistro(
+                        "Suscrito a: " +
+                        TOPIC_DATOS
+                    );
+
+                }
+
+            }
+        );
+
+    });
+
+
+    // =====================================================
+    // MENSAJE RECIBIDO
+    // =====================================================
+
+    cliente.on("message", function(topic, message) {
+
+        const texto = message.toString();
+
+        console.log(
+            "Mensaje recibido:",
+            topic,
+            texto
+        );
+
+
+        // Mostrar mensaje completo
+
+        datos.value = texto;
+
+
+        agregarRegistro(
+            "? " +
+            topic +
+            " : " +
+            texto
+        );
+
+    });
+
+
+    // =====================================================
+    // ERROR
+    // =====================================================
+
+    cliente.on("error", function(error) {
+
+        console.log(
+            "Error MQTT:",
+            error
+        );
+
+        agregarRegistro(
+            "? Error MQTT"
+        );
+
+    });
+
+
+    // =====================================================
+    // DESCONECTADO
+    // =====================================================
+
+    cliente.on("close", function() {
+
+        estado.innerHTML =
+            "?? MQTT DESCONECTADO";
+
+        estado.classList.remove("conectado");
+
+        agregarRegistro(
+            "MQTT desconectado"
+        );
+
+    });
+
+
+    // =====================================================
+    // ENVIAR COMANDO
+    // =====================================================
+
+    function enviarComando() {
+
+        const campo =
+            document.getElementById("comando");
+
+        const comando =
+            campo.value.trim();
+
+
+        if (comando === "") {
+
+            return;
+
+        }
+
+
+        if (!cliente.connected) {
+
+            alert(
+                "No hay conexión con MQTT"
+            );
+
+            return;
+
+        }
+
+
+        // Publicar comando
+
+        cliente.publish(
+            TOPIC_COMANDO,
+            comando
+        );
+
+
+        agregarRegistro(
+            "? " +
+            TOPIC_COMANDO +
+            " : " +
+            comando
+        );
+
+
+        campo.value = "";
+
+    }
+
+
+    // =====================================================
+    // REGISTRO
+    // =====================================================
+
+    function agregarRegistro(texto) {
+
+        const hora =
+            new Date().toLocaleTimeString();
+
+        registro.innerHTML +=
+            "[" +
+            hora +
+            "] " +
+            texto +
+            "<br>";
+
+        registro.scrollTop =
+            registro.scrollHeight;
+
+    }
+
+
+    // =====================================================
+    // ENTER PARA ENVIAR
+    // =====================================================
+
+    document
+        .getElementById("comando")
+        .addEventListener(
+            "keydown",
+            function(event) {
+
+                if (event.key === "Enter") {
+
+                    enviarComando();
+
+                }
+
+            }
+        );
+
+</script>
+
+</body>
+</html> para los 4 idiomas disponibles
