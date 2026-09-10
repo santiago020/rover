@@ -53,6 +53,12 @@ body{
 ::-webkit-scrollbar-track{ background:transparent; }
 ::-webkit-scrollbar-thumb{ background:var(--line-bright); border-radius:4px; }
 
+/* números que no "brincan" de ancho al cambiar de dígito */
+.sc-val, .axis-val, .digi-card .state, .hero-num .big, .hero-stat .v{
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
 /* ============ TOP BAR ============ */
 .topbar{
   position:sticky; top:0; z-index:50;
@@ -101,27 +107,43 @@ body{
 }
 .jumpnav a:hover{ color:var(--text); background:var(--panel-raised); }
 
-/* ============ HERO STRIP & BATTERY ============ */
+/* ============ BATERÍA (prioritaria, arriba de todo) ============ */
+.battery-strip{
+  max-width:1180px; margin:16px auto 0; padding:14px 22px;
+  display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg, rgba(155,140,255,0.06), transparent);
+}
+.batt-left{ display:flex; align-items:baseline; gap:9px; }
+.batt-label{ font-size:12px; color:var(--text-dim); }
+.batt-value{ font-family:var(--font-data); font-size:27px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--violet); transition:color .3s; }
+.batt-unit{ font-size:12px; color:var(--text-dim); font-weight:400; }
+.batt-trend{ font-family:var(--font-data); font-size:16px; font-weight:700; min-width:16px; display:inline-block; }
+.batt-trend.up{ color:var(--green); }
+.batt-trend.down{ color:var(--red); }
+.batt-trend.flat{ color:var(--text-faint); }
+.batt-gauge-wrap{ display:flex; align-items:center; gap:10px; flex:1; min-width:160px; max-width:360px; }
+.batt-gauge{ flex:1; height:9px; border-radius:5px; background:var(--panel-raised); border:1px solid var(--line-bright); overflow:hidden; }
+.batt-gauge-fill{ height:100%; width:0%; background:var(--violet); transition:width .4s, background .4s; }
+.batt-pct{ font-family:var(--font-data); font-size:12px; color:var(--text-dim); min-width:34px; text-align:right; font-variant-numeric:tabular-nums; }
+.battery-strip.warn .batt-gauge-fill{ background:var(--amber); }
+.battery-strip.warn .batt-value{ color:var(--amber); }
+.battery-strip.crit .batt-gauge-fill{ background:var(--red); }
+.battery-strip.crit .batt-value{ color:var(--red); }
+@media (max-width:760px){ .battery-strip{ padding:12px 14px; } }
+
+/* ============ HERO STRIP ============ */
 .hero{
   max-width:1180px; margin:0 auto; padding:26px 22px 4px;
   display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
 }
 .hero-num{ display:flex; align-items:baseline; gap:10px; }
-.hero-num .big{ font-family:var(--font-data); font-size:46px; font-weight:700; letter-spacing:-1px; line-height:1; font-variant-numeric: tabular-nums;}
+.hero-num .big{ font-family:var(--font-data); font-size:46px; font-weight:700; letter-spacing:-1px; line-height:1;}
 .hero-num .lbl{ color:var(--text-dim); font-size:13px; }
-.hero-right{ display:flex; gap:22px; flex-wrap:wrap; align-items:center; }
+.hero-right{ display:flex; gap:22px; flex-wrap:wrap; }
 .hero-stat{ text-align:right; }
-.hero-stat .v{ font-family:var(--font-data); font-size:18px; font-weight:600; font-variant-numeric: tabular-nums;}
+.hero-stat .v{ font-family:var(--font-data); font-size:18px; font-weight:600; }
 .hero-stat .l{ font-size:10.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;}
-
-/* Tarjeta de batería prioritaria */
-.battery-card{
-  background:var(--panel-raised); border:1px solid var(--line-bright);
-  border-radius:10px; padding:10px 16px; display:flex; align-items:center; gap:14px;
-}
-.battery-icon{ font-size:24px; }
-.battery-info .val{ font-family:var(--font-data); font-size:20px; font-weight:700; color:var(--green); font-variant-numeric: tabular-nums; }
-.battery-info .lbl{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; }
 
 /* ============ LAYOUT ============ */
 .wrap{ max-width:1180px; margin:0 auto; padding:18px 22px 6px; }
@@ -148,22 +170,23 @@ section{ scroll-margin-top:120px; margin-bottom:30px; }
 .sensor-card{
   background:var(--panel-raised); border:1px solid var(--line); border-radius:9px;
   padding:12px 13px 8px; position:relative; overflow:hidden;
-  transition:border-color .25s, box-shadow .25s, opacity .3s;
+  transition:border-color .25s, box-shadow .25s, opacity .3s, filter .3s;
 }
 .sensor-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:2.5px; background:var(--accent, var(--line-bright)); }
 .sensor-card.alert{ border-color:rgba(255,84,104,0.45); box-shadow:0 0 16px rgba(255,84,104,0.1); }
 .sensor-card.alert::before{ background:var(--red); }
-
-/* Estado sin datos recientes (stale) */
-.sensor-card.stale{ opacity:0.38; filter:grayscale(80%); }
-.sensor-card.stale .sc-flag::after{ content:' [SIN DATO]'; color:var(--amber); }
-
+.sensor-card.stale{ opacity:0.42; filter:grayscale(0.55); }
+.sensor-card.never{ border-style:dashed; border-color:var(--line-bright); }
+.sensor-card.loading, .digi-card.loading{
+  background:linear-gradient(90deg, var(--panel-raised) 25%, var(--line-bright) 37%, var(--panel-raised) 63%);
+  background-size:400% 100%; animation:shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer{ 0%{ background-position:100% 0; } 100%{ background-position:0 0; } }
 .sc-top{ display:flex; justify-content:space-between; align-items:center; }
 .sc-id{ font-family:var(--font-data); font-size:10.5px; color:var(--text-dim); letter-spacing:0.3px;}
 .sc-flag{ font-size:9px; font-family:var(--font-data); color:var(--red); font-weight:700; opacity:0; }
-.sensor-card.alert .sc-flag, .sensor-card.stale .sc-flag{ opacity:1; }
-
-.sc-val{ font-family:var(--font-data); font-size:21px; font-weight:700; margin-top:5px; letter-spacing:-0.5px; font-variant-numeric: tabular-nums;}
+.sensor-card.alert .sc-flag{ opacity:1; }
+.sc-val{ font-family:var(--font-data); font-size:21px; font-weight:700; margin-top:5px; letter-spacing:-0.5px;}
 .sc-unit{ font-size:10.5px; color:var(--text-dim); margin-left:2px; font-weight:400;}
 .spark{ width:100%; height:22px; margin-top:6px; display:block; }
 .spark polyline{ fill:none; stroke-width:1.4; }
@@ -173,36 +196,33 @@ section{ scroll-margin-top:120px; margin-bottom:30px; }
 .digi-card{
   background:var(--panel-raised); border:1px solid var(--line); border-radius:9px;
   padding:13px; display:flex; align-items:center; justify-content:space-between;
-  transition:opacity .3s, transform .2s;
+  transition:opacity .3s, filter .3s;
 }
-.digi-card.stale{ opacity:0.38; }
+.digi-card.stale{ opacity:0.42; filter:grayscale(0.55); }
+.digi-card.never{ border-style:dashed; border-color:var(--line-bright); }
 .digi-led{ width:11px; height:11px; border-radius:50%; background:var(--text-faint); transition:.25s; }
 .digi-led.on{ background:var(--green); box-shadow:0 0 9px var(--green); }
 .digi-card .name{ font-family:var(--font-data); font-size:11.5px; color:var(--text-dim); }
 .digi-card .state{ font-family:var(--font-data); font-weight:700; font-size:12.5px; color:var(--text-dim); }
-
-/* Animación de pulso al cambiar de estado */
-@keyframes pulse-card {
-  0% { transform: scale(1); border-color: var(--cyan); }
-  50% { transform: scale(1.03); border-color: var(--cyan); box-shadow: 0 0 12px rgba(61,219,217,0.3); }
-  100% { transform: scale(1); }
+@keyframes digiPulse{
+  0%{ box-shadow:0 0 0 0 rgba(61,219,217,0.55); }
+  100%{ box-shadow:0 0 0 11px rgba(61,219,217,0); }
 }
-.digi-card.pulse-anim { animation: pulse-card 0.35s ease-out; }
+.digi-card.pulse{ animation:digiPulse .55s ease-out; }
 
 /* IMU */
 .imu-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:14px; }
 .imu-axis{ background:var(--panel-raised); border-radius:9px; padding:13px; text-align:center; border-top:2px solid var(--line-bright); }
 .imu-axis.x{ border-top-color:#ff5f6d; } .imu-axis.y{ border-top-color:#3ddbd9; } .imu-axis.z{ border-top-color:#ffb020; }
 .imu-axis .axis-lbl{ font-family:var(--font-data); font-size:10.5px; color:var(--text-dim); }
-.imu-axis .axis-val{ font-family:var(--font-data); font-size:22px; font-weight:700; margin-top:3px; font-variant-numeric: tabular-nums; }
-
+.imu-axis .axis-val{ font-family:var(--font-data); font-size:22px; font-weight:700; margin-top:3px; }
 .chart-wrap{ height:230px; position:relative; }
-.chart-overlay{
+.chart-placeholder{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  background:rgba(13,17,23,0.75); color:var(--text-dim); font-family:var(--font-data);
-  font-size:13px; pointer-events:none; backdrop-filter:blur(2px); transition:opacity .3s;
+  color:var(--text-faint); font-family:var(--font-data); font-size:12.5px; letter-spacing:0.2px;
+  pointer-events:none; transition:opacity .25s;
 }
-.chart-overlay.hidden{ opacity:0; visibility:hidden; }
+.chart-placeholder.hidden{ opacity:0; visibility:hidden; }
 
 /* CHART CONTROLS */
 .chart-controls{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
@@ -214,41 +234,37 @@ select{ font-family:var(--font-data); cursor:pointer; }
 .range-btns{ display:flex; gap:4px; margin-left:auto; }
 .range-btns button{ background:var(--panel-raised); border:1px solid var(--line-bright); color:var(--text-dim); padding:7px 11px; border-radius:7px; font-family:var(--font-data); font-size:11.5px; cursor:pointer; }
 .range-btns button.active{ background:var(--cyan-dim); color:#bdf7f6; border-color:var(--cyan); }
-.btn{ cursor:pointer; transition:border-color .2s, background .2s, transform .1s; user-select:none; }
+.btn{ cursor:pointer; transition:border-color .2s, background .2s; }
 .btn:hover{ border-color:var(--text-dim); }
 .btn.ghost{ background:transparent; }
 .btn.danger{ border-color:var(--red); color:var(--red); }
 .btn.danger:hover{ background:var(--red-dim); }
 .btn.primary{ background:var(--amber); color:#191204; border-color:var(--amber); font-weight:600;}
 
-/* Confirmación visual al presionar botón */
-.btn-flash {
-  animation: btn-flash-anim 0.25s ease-out;
-}
-@keyframes btn-flash-anim {
-  0% { background-color: var(--cyan); color: #000; box-shadow: 0 0 14px var(--cyan); }
-  100% { }
-}
-
 /* CONTROL PAD */
 .control-layout{ display:grid; grid-template-columns:1fr 230px; gap:24px; align-items:start; }
-.dpad{ display:grid; grid-template-columns:repeat(3,68px); grid-template-rows:repeat(3,68px); gap:7px; justify-content:center; margin:0 auto; user-select:none;}
-.dpad button{ 
-  background:var(--panel-raised); border:1px solid var(--line-bright); border-radius:11px; 
-  color:var(--text); font-size:22px; cursor:pointer; display:flex; align-items:center; 
-  justify-content:center; transition:transform .08s, background .15s; touch-action:manipulation;
-}
-.dpad button:active, .dpad button.is-pressed{ transform:scale(0.92); background:var(--cyan-dim); border-color:var(--cyan); }
+.dpad{ display:grid; grid-template-columns:repeat(3,68px); grid-template-rows:repeat(3,68px); gap:7px; justify-content:center; margin:0 auto; touch-action:none; }
+.dpad button{ background:var(--panel-raised); border:1px solid var(--line-bright); border-radius:11px; color:var(--text); font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .08s, background .15s, border-color .15s; user-select:none; }
+.dpad button:active{ transform:scale(0.93); }
+.dpad button.sent{ background:var(--green-dim); border-color:var(--green); }
+.dpad button.blocked{ opacity:0.35; }
 .dpad .fwd{ grid-column:2; grid-row:1; } .dpad .left{ grid-column:1; grid-row:2; }
 .dpad .stop{ grid-column:2; grid-row:2; background:var(--red-dim); border-color:var(--red); color:#ffb3ba; }
+.dpad .stop.sent{ background:var(--red); color:#2b0508; }
 .dpad .right{ grid-column:3; grid-row:2; } .dpad .back{ grid-column:2; grid-row:3; }
 .mode-toggle{ display:flex; gap:8px; margin-top:16px; }
 .mode-toggle button{ flex:1; padding:11px; border-radius:8px; border:1px solid var(--line-bright); background:var(--panel-raised); color:var(--text-dim); cursor:pointer; font-family:var(--font-ui); font-size:12.5px;}
 .mode-toggle button.active{ background:var(--amber); color:#191204; border-color:var(--amber); font-weight:600; }
 .field-row{ display:flex; gap:8px; margin-top:16px; }
 .field-row input{ flex:1; }
+.field-row button.sent{ background:var(--green); border-color:var(--green); color:#04170c; }
 .meta-line{ display:flex; gap:16px; flex-wrap:wrap; margin-top:12px; font-size:11.5px; color:var(--text-dim); font-family:var(--font-data); }
 .meta-line b{ color:var(--text); }
+.meta-line b.ack-ok{ color:var(--green); }
+.meta-line b.ack-pending{ color:var(--amber); }
+.meta-line b.ack-fail{ color:var(--red); }
+.kbd-hint{ margin-top:10px; font-size:11px; color:var(--text-faint); font-family:var(--font-data); }
+.kbd-hint kbd{ background:var(--panel-raised); border:1px solid var(--line-bright); border-radius:4px; padding:1px 5px; font-family:var(--font-data); }
 
 /* LOG */
 .log{ height:230px; overflow-y:auto; font-family:var(--font-data); font-size:11.5px; background:var(--void); border:1px solid var(--line); border-radius:8px; padding:12px; }
@@ -256,7 +272,7 @@ select{ font-family:var(--font-data); cursor:pointer; }
 .log-line .tag{ flex-shrink:0; font-weight:700; width:60px; }
 .log-line .t{ color:var(--text-faint); flex-shrink:0; }
 .tag.mqtt-in{ color:var(--cyan); } .tag.mqtt-out{ color:var(--amber); }
-.tag.conn{ color:var(--green); } .tag.disc{ color:var(--red); } .tag.err{ color:var(--red); } .tag.sys{ color:var(--text-dim); }
+.tag.conn{ color:var(--green); } .tag.disc{ color:var(--red); } .tag.err{ color:var(--red); } .tag.sys{ color:var(--text-dim); } .tag.ack{ color:var(--violet); }
 
 /* PACKET */
 .packet-box{ background:var(--void); border:1px solid var(--line); border-radius:8px; padding:14px; font-family:var(--font-data); font-size:12px; word-break:break-all; min-height:52px; color:var(--cyan); line-height:1.6;}
@@ -267,7 +283,7 @@ select{ font-family:var(--font-data); cursor:pointer; }
 .stat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px; }
 .stat{ background:var(--panel-raised); border:1px solid var(--line); border-radius:9px; padding:12px 13px; border-left:2.5px solid var(--line-bright); }
 .stat .lbl{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; }
-.stat .val{ font-family:var(--font-data); font-size:17px; font-weight:600; margin-top:5px; font-variant-numeric: tabular-nums; }
+.stat .val{ font-family:var(--font-data); font-size:17px; font-weight:600; margin-top:5px; }
 .stat.ok{ border-left-color:var(--green); } .stat.bad{ border-left-color:var(--red); }
 
 /* RESPONSIVE */
@@ -279,12 +295,22 @@ select{ font-family:var(--font-data); cursor:pointer; }
 }
 
 /* MOBILE STICKY CONTROL BAR */
-.mobile-bar{ display:none; position:fixed; bottom:0; left:0; right:0; z-index:60; background:rgba(7,9,13,0.96); backdrop-filter:blur(12px); border-top:1px solid var(--line); padding:9px 14px calc(9px + env(safe-area-inset-bottom)); align-items:center; gap:10px; user-select:none;}
-.mobile-bar .mini-dpad{ display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(2,44px); gap:4px; }
-.mobile-bar .mini-dpad button{ background:var(--panel-raised); border:1px solid var(--line-bright); border-radius:8px; color:var(--text); font-size:16px; touch-action:manipulation;}
+.mobile-bar{ display:none; position:fixed; bottom:0; left:0; right:0; z-index:60; background:rgba(7,9,13,0.96); backdrop-filter:blur(12px); border-top:1px solid var(--line); padding:9px 14px calc(9px + env(safe-area-inset-bottom)); align-items:center; gap:10px; }
+.mobile-bar .mini-dpad{ display:grid; grid-template-columns:repeat(3,38px); grid-template-rows:repeat(2,38px); gap:4px; touch-action:none; }
+.mobile-bar .mini-dpad button{ background:var(--panel-raised); border:1px solid var(--line-bright); border-radius:8px; color:var(--text); font-size:15px; transition:background .15s, border-color .15s; user-select:none; }
+.mobile-bar .mini-dpad button.sent{ background:var(--green-dim); border-color:var(--green); }
+.mobile-bar .mini-dpad button.blocked{ opacity:0.35; }
 .mobile-bar .mini-dpad .f{ grid-column:2; grid-row:1; } .mobile-bar .mini-dpad .l{ grid-column:1; grid-row:2; } .mobile-bar .mini-dpad .r{ grid-column:3; grid-row:2; } .mobile-bar .mini-dpad .b{ grid-column:2; grid-row:2; }
-.mobile-stop{ flex:1; background:var(--red); color:#2b0508; font-weight:700; border:none; border-radius:10px; height:52px; font-size:15px; font-family:var(--font-ui); cursor:pointer;}
+.mobile-stop{ flex:1; background:var(--red); color:#2b0508; font-weight:700; border:none; border-radius:10px; height:52px; font-size:15px; font-family:var(--font-ui); transition:filter .15s; }
+.mobile-stop.sent{ filter:brightness(1.4); }
 @media (max-width:760px){ .mobile-bar{ display:flex; } body{ padding-bottom:96px; } }
+
+/* ============ ACCESIBILIDAD: foco de teclado visible ============ */
+.dpad button:focus-visible, .mini-dpad button:focus-visible, .mobile-stop:focus-visible,
+.mode-toggle button:focus-visible, .btn:focus-visible, select:focus-visible,
+input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible{
+  outline:2px solid var(--cyan); outline-offset:2px;
+}
 </style>
 </head>
 <body>
@@ -318,6 +344,19 @@ select{ font-family:var(--font-data); cursor:pointer; }
   <a href="#estado">Estado del sistema</a>
 </div>
 
+<!-- ================= BATERÍA (prioritaria) ================= -->
+<div class="battery-strip" id="batteryStrip">
+  <div class="batt-left">
+    <span class="batt-label">Batería</span>
+    <span class="batt-value" id="battValue">— <span class="batt-unit">V</span></span>
+    <span class="batt-trend" id="battTrend" aria-hidden="true"></span>
+  </div>
+  <div class="batt-gauge-wrap">
+    <div class="batt-gauge"><div class="batt-gauge-fill" id="battGaugeFill"></div></div>
+    <span class="batt-pct" id="battPct">—%</span>
+  </div>
+</div>
+
 <!-- ================= HERO ================= -->
 <div class="hero">
   <div class="hero-num">
@@ -325,14 +364,6 @@ select{ font-family:var(--font-data); cursor:pointer; }
     <span class="lbl">sensores reportando</span>
   </div>
   <div class="hero-right">
-    <!-- Tarjeta de Batería Principal -->
-    <div class="battery-card">
-      <div class="battery-icon">🔋</div>
-      <div class="battery-info">
-        <div class="val" id="valBat">--.- V</div>
-        <div class="lbl" id="lblBatPct">BATERÍA --%</div>
-      </div>
-    </div>
     <div class="hero-stat"><div class="v" id="heroUptime">00:00:00</div><div class="l">en línea</div></div>
     <div class="hero-stat"><div class="v" id="heroLastUpdate">—</div><div class="l">última lectura</div></div>
     <div class="hero-stat"><div class="v" id="heroRssi">— dBm</div><div class="l">RSSI LoRa</div></div>
@@ -374,8 +405,8 @@ select{ font-family:var(--font-data); cursor:pointer; }
         <div class="imu-axis z"><div class="axis-lbl">Z</div><div class="axis-val" id="valImuZ">0.00</div></div>
       </div>
       <div class="chart-wrap">
-        <div class="chart-overlay" id="imuChartOverlay">Esperando telemetría...</div>
         <canvas id="imuChart"></canvas>
+        <div class="chart-placeholder" id="imuChartPlaceholder">Esperando telemetría...</div>
       </div>
     </div>
   </section>
@@ -396,8 +427,8 @@ select{ font-family:var(--font-data); cursor:pointer; }
         <button class="btn danger" id="btnClearChart">Limpiar historial</button>
       </div>
       <div class="chart-wrap">
-        <div class="chart-overlay" id="mainChartOverlay">Esperando telemetría...</div>
         <canvas id="mainChart"></canvas>
+        <div class="chart-placeholder" id="mainChartPlaceholder">Esperando telemetría...</div>
       </div>
     </div>
   </section>
@@ -409,21 +440,19 @@ select{ font-family:var(--font-data); cursor:pointer; }
       <div class="control-layout">
         <div>
           <div class="dpad">
-            <button class="fwd hold-btn" data-cmd="ADELANTE">⬆️</button>
-            <button class="left hold-btn" data-cmd="IZQUIERDA">⬅️</button>
-            <button class="stop" id="btnStopDesktop" onclick="triggerVisualFeedback(this); sendMove('STOP');">🛑</button>
-            <button class="right hold-btn" data-cmd="DERECHA">➡️</button>
-            <button class="back hold-btn" data-cmd="ATRAS">⬇️</button>
+            <button class="fwd" data-dir="ADELANTE" aria-label="Avanzar">⬆️</button>
+            <button class="left" data-dir="IZQUIERDA" aria-label="Girar a la izquierda">⬅️</button>
+            <button class="stop" data-dir="STOP" aria-label="Detener">🛑</button>
+            <button class="right" data-dir="DERECHA" aria-label="Girar a la derecha">➡️</button>
+            <button class="back" data-dir="ATRAS" aria-label="Retroceder">⬇️</button>
           </div>
-          <p style="text-align:center; font-size:11px; color:var(--text-dim); margin-top:10px; font-family:var(--font-data);">
-            💡 Mantén presionado para mover. Usa flechas del teclado en escritorio (Espacio = STOP).
-          </p>
+          <div class="kbd-hint">Mantén presionado para moverte · o usa <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>espacio</kbd> para parar</div>
         </div>
         <div>
           <div class="section-sub">Modo de operación</div>
           <div class="mode-toggle">
-            <button id="btnAuto" onclick="triggerVisualFeedback(this); setMode('AUTO');">🤖 Auto</button>
-            <button id="btnManual" class="active" onclick="triggerVisualFeedback(this); setMode('MANUAL');">🎮 Manual</button>
+            <button id="btnAuto" onclick="setMode('AUTO')">🤖 Auto</button>
+            <button id="btnManual" class="active" onclick="setMode('MANUAL')">🎮 Manual</button>
           </div>
           <div class="section-sub" style="margin-top:16px;">Estado actual</div>
           <div style="font-family:var(--font-data); font-size:15px; margin-top:6px; font-weight:600;" id="valRoverState">DETENIDO</div>
@@ -431,7 +460,7 @@ select{ font-family:var(--font-data); cursor:pointer; }
       </div>
       <div class="field-row">
         <input type="text" id="cmdInput" placeholder="Comando personalizado (topic rover/comando)...">
-        <button class="btn primary" onclick="triggerVisualFeedback(this); sendCustomCmd();">Enviar</button>
+        <button class="btn primary" id="btnSendCustom" onclick="sendCustomCmd()">Enviar</button>
       </div>
       <div class="meta-line">
         <span>Topic: <b id="topicComandoVal">rover/comando</b></span>
@@ -485,23 +514,30 @@ select{ font-family:var(--font-data); cursor:pointer; }
 <!-- ================= MOBILE STICKY BAR ================= -->
 <div class="mobile-bar">
   <div class="mini-dpad">
-    <button class="f hold-btn" data-cmd="ADELANTE">⬆</button>
-    <button class="l hold-btn" data-cmd="IZQUIERDA">⬅</button>
-    <button class="r hold-btn" data-cmd="DERECHA">➡</button>
-    <button class="b hold-btn" data-cmd="ATRAS">⬇</button>
+    <button class="f" data-dir="ADELANTE" aria-label="Avanzar">⬆</button>
+    <button class="l" data-dir="IZQUIERDA" aria-label="Girar a la izquierda">⬅</button>
+    <button class="r" data-dir="DERECHA" aria-label="Girar a la derecha">➡</button>
+    <button class="b" data-dir="ATRAS" aria-label="Retroceder">⬇</button>
   </div>
-  <button class="mobile-stop" onclick="triggerVisualFeedback(this); sendMove('STOP');">🛑 STOP</button>
+  <button class="mobile-stop" data-dir="STOP" aria-label="Detener">🛑 STOP</button>
 </div>
 
 <script>
 /* ============================================================
    CONFIGURACIÓN MQTT
+   ⚠ Estas credenciales quedan visibles en el código fuente que
+   llega al navegador (cualquiera con "ver código fuente" las ve).
+   Si este panel se aloja en un sitio público (ej. GitHub Pages),
+   usa un usuario MQTT de solo-suscripción con permisos limitados
+   para el topic de datos, o sirve esta página desde un backend
+   /proxy que no exponga la contraseña real del broker.
 ============================================================ */
 const BROKER = "wss://f9980291ea454f999cbfb77ee79a623b.s1.eu.hivemq.cloud:8884/mqtt";
 const MQTT_USER = "rover";
 const MQTT_PASSWORD = "Rover2026!";
 const TOPIC_DATOS = "rover/sensores";
 const TOPIC_COMANDO = "rover/comando";
+const TOPIC_ACK = "rover/ack";
 const CLIENT_ID = "WEB_ROVER_" + Math.random().toString(16).substring(2);
 document.getElementById('topicComandoVal').textContent = TOPIC_COMANDO;
 
@@ -512,42 +548,51 @@ const CORRIENTES = Array.from({length:10}, (_,i)=>({ id:`C${i+1}`, label:`C${i+1
 const ENCODERS_ABS = Array.from({length:6}, (_,i)=>({ id:`EA${i+1}`, label:`EA${i+1}`, unit:'°', min:0, max:360, accent:'var(--amber)' }));
 const ENCODERS_INC = Array.from({length:4}, (_,i)=>({ id:`EI${i+1}`, label:`EI${i+1}` }));
 const IMU_AXES = [{id:'IMUX',label:'IMU X'},{id:'IMUY',label:'IMU Y'},{id:'IMUZ',label:'IMU Z'}];
-const ALL_SENSOR_IDS = [...CORRIENTES.map(s=>s.id), ...ENCODERS_ABS.map(s=>s.id), ...ENCODERS_INC.map(s=>s.id), ...IMU_AXES.map(s=>s.id)];
+// Batería: viene en el campo BAT del paquete (voltios). Ajusta min/warn/max
+// al rango real de tu paquete de baterías (aquí van valores de ejemplo
+// para un LiPo 3S: 10.5V vacía, 11.1V aviso, 12.6V llena).
+const BATTERY = { id:'BAT', label:'Batería', unit:'V', min:10.5, warn:11.1, max:12.6 };
+const ALL_SENSOR_IDS = [BATTERY.id, ...CORRIENTES.map(s=>s.id), ...ENCODERS_ABS.map(s=>s.id), ...ENCODERS_INC.map(s=>s.id), ...IMU_AXES.map(s=>s.id)];
+const NUMERIC_TOTAL = CORRIENTES.length + ENCODERS_ABS.length;
+const DIGITAL_TOTAL = ENCODERS_INC.length;
 const REPORTING_TOTAL = ALL_SENSOR_IDS.length;
 
 /* ============================================================
-   ESTADO Y TIMESTAMPS INDIVIDUALES
+   ESTADO
 ============================================================ */
 const state = {
   mqttConnected:false, loraOk:false,
   lastPacketRaw:null, lastPacketTime:null,
   msgIn:0, msgOut:0, errors:0, connectedAt:null,
-  values:{}, history:{}, activeIds:new Set(),
+  values:{}, history:{}, activeIds:new Set(), lastUpdate:{},
   mode:'MANUAL', roverState:'DETENIDO',
-  lastUpdatePerSensor:{},
-  batteryVoltage: null,
-  hasReceivedData: false
+  pendingCmd:null, // {id, dir, sentAt, timeoutHandle}
+  heldDir:null, // única dirección activa a la vez (botón o teclado)
 };
 ALL_SENSOR_IDS.forEach(id => { state.history[id] = []; });
 
 const LORA_TIMEOUT_MS = 8000;
-const SENSOR_STALE_MS = 10000; // 10 segundos para marcar un sensor sin datos
 const RSSI_LOW_THRESHOLD = -95;
 const MAX_HISTORY_MS = 15*60*1000;
 const SPARK_WINDOW_MS = 30*1000;
+const STALE_TIMEOUT_MS = 10000; // sensor sin dato reciente pero con enlace ok
+const ACK_TIMEOUT_MS = 3000; // si no llega ACK en este tiempo, se marca como "sin confirmar"
+const BATT_TREND_WINDOW_MS = 45*1000; // ventana para comparar y calcular tendencia
+const BATT_TREND_DEADBAND = 0.02; // V — ignora ruido menor a esto
 
 const $ = id => document.getElementById(id);
 const logBox = $('log');
+let firstPacketReceived = false;
 
 /* ============================================================
-   RELOJ / TICKS Y VERIFICACIÓN DE SENSORES DESCONECTADOS
+   RELOJ / TICKS
 ============================================================ */
 setInterval(()=>{
   $('clockChip').textContent = new Date().toLocaleTimeString('es-CO');
   updateSinceLast();
   updateUptime();
   checkLoraTimeout();
-  checkStaleSensors();
+  updateStaleStates();
 }, 1000);
 
 function updateUptime(){
@@ -577,14 +622,28 @@ function checkLoraTimeout(){
   renderAlerts();
 }
 
-function checkStaleSensors(){
+/* Marca tarjetas de sensores individuales que llevan más de
+   STALE_TIMEOUT_MS sin actualizar su valor, aunque el enlace
+   general (MQTT/LoRa) siga activo — ej. un cable suelto.
+   También distingue "nunca reportó" (.never, borde punteado)
+   de "reportó antes y dejó de hacerlo" (.stale, atenuado). */
+function updateStaleStates(){
   const now = Date.now();
-  ALL_SENSOR_IDS.forEach(id => {
-    const card = $('card_' + id);
+  ALL_SENSOR_IDS.forEach(id=>{
+    const card = $('card_'+id);
     if(!card) return;
-    const last = state.lastUpdatePerSensor[id];
-    const isStale = (!last || (now - last > SENSOR_STALE_MS));
-    card.classList.toggle('stale', isStale);
+    const last = state.lastUpdate[id];
+    if(!last){
+      // nunca ha reportado: solo aplica "never" después del primer paquete
+      // recibido de cualquier tipo (antes de eso, sigue en estado "loading")
+      if(firstPacketReceived){
+        card.classList.remove('loading','stale');
+        card.classList.add('never');
+      }
+      return;
+    }
+    card.classList.remove('never');
+    card.classList.toggle('stale', (now-last) > STALE_TIMEOUT_MS);
   });
 }
 
@@ -595,8 +654,8 @@ function addLog(tag, msg){
   const line = document.createElement('div');
   line.className = 'log-line';
   const hora = new Date().toLocaleTimeString('es-CO');
-  const tagClass = {mqtt_in:'mqtt-in', mqtt_out:'mqtt-out', conn:'conn', disc:'disc', err:'err', sys:'sys'}[tag] || 'sys';
-  const tagText = {mqtt_in:'MQTT IN', mqtt_out:'MQTT OUT', conn:'CONEXIÓN', disc:'DESCONEX.', err:'ERROR', sys:'SISTEMA'}[tag] || tag;
+  const tagClass = {mqtt_in:'mqtt-in', mqtt_out:'mqtt-out', conn:'conn', disc:'disc', err:'err', sys:'sys', ack:'ack'}[tag] || 'sys';
+  const tagText = {mqtt_in:'MQTT IN', mqtt_out:'MQTT OUT', conn:'CONEXIÓN', disc:'DESCONEX.', err:'ERROR', sys:'SISTEMA', ack:'ACK'}[tag] || tag;
   line.innerHTML = `<span class="t">${hora}</span><span class="tag ${tagClass}">${tagText}</span><span>${msg}</span>`;
   logBox.appendChild(line);
   logBox.scrollTop = logBox.scrollHeight;
@@ -609,7 +668,7 @@ function clearLog(){ logBox.innerHTML=''; addLog('sys','Registro limpiado'); }
 ============================================================ */
 function numericCardHTML(s){
   return `
-    <div class="sensor-card stale" id="card_${s.id}" style="--accent:${s.accent}">
+    <div class="sensor-card" id="card_${s.id}" style="--accent:${s.accent}">
       <div class="sc-top"><span class="sc-id">${s.label}</span><span class="sc-flag">⚠</span></div>
       <div class="sc-val" id="val_${s.id}">— <span class="sc-unit">${s.unit}</span></div>
       <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none">
@@ -621,7 +680,7 @@ CORRIENTES.forEach(s=> $('gridCorrientes').insertAdjacentHTML('beforeend', numer
 ENCODERS_ABS.forEach(s=> $('gridAnalogicas').insertAdjacentHTML('beforeend', numericCardHTML(s)));
 ENCODERS_INC.forEach(s=>{
   $('gridDigitales').insertAdjacentHTML('beforeend', `
-    <div class="digi-card stale" id="card_${s.id}">
+    <div class="digi-card" id="card_${s.id}">
       <span class="name">${s.label}</span>
       <div style="display:flex; align-items:center; gap:8px;">
         <span class="state" id="val_${s.id}">OFF</span>
@@ -629,6 +688,9 @@ ENCODERS_INC.forEach(s=>{
       </div>
     </div>`);
 });
+// Mientras no hay conexión MQTT, las tarjetas muestran un shimmer de carga
+// en vez de "—", para no dar la impresión de que el panel está roto.
+document.querySelectorAll('.sensor-card, .digi-card').forEach(c=> c.classList.add('loading'));
 
 /* ============================================================
    POBLAR SELECT DE GRÁFICAS
@@ -636,6 +698,7 @@ ENCODERS_INC.forEach(s=>{
 const chartSelect = $('chartSelect');
 function opt(v,l){ return `<option value="${v}">${l}</option>`; }
 chartSelect.insertAdjacentHTML('beforeend', `<optgroup label="Grupos">${opt('ALL_C','Todas las corrientes')}${opt('ALL_EA','Todos los encoders absolutos')}${opt('ALL_EI','Todos los encoders incrementales')}${opt('IMU','IMU (3 ejes)')}</optgroup>`);
+chartSelect.insertAdjacentHTML('beforeend', `<optgroup label="Batería">${opt(BATTERY.id,BATTERY.label)}</optgroup>`);
 chartSelect.insertAdjacentHTML('beforeend', `<optgroup label="Corrientes">${CORRIENTES.map(s=>opt(s.id,s.label)).join('')}</optgroup>`);
 chartSelect.insertAdjacentHTML('beforeend', `<optgroup label="Encoders absolutos">${ENCODERS_ABS.map(s=>opt(s.id,s.label)).join('')}</optgroup>`);
 chartSelect.insertAdjacentHTML('beforeend', `<optgroup label="Encoders incrementales">${ENCODERS_INC.map(s=>opt(s.id,s.label)).join('')}</optgroup>`);
@@ -661,7 +724,12 @@ $('btnClearChart').addEventListener('click', ()=>{
 $('btnExportCsv').addEventListener('click', exportCSV);
 
 /* ============================================================
-   CHART.JS SETUP CON OVERLAYS DE TELEMETRÍA
+   CHART.JS SETUP
+   Nota: se activa el plugin de decimation (algoritmo LTTB) para
+   que los rangos largos (5–15 min) con varias series a la vez no
+   sobrecarguen el render en equipos gama media. Solo entra en
+   juego cuando hay más puntos que "samples", así que en rangos
+   cortos no cambia nada visualmente.
 ============================================================ */
 Chart.defaults.color = '#7c8798';
 Chart.defaults.font.family = "'JetBrains Mono', monospace";
@@ -669,12 +737,16 @@ Chart.defaults.font.size = 10.5;
 
 const chartBaseOpts = {
   animation:false, responsive:true, maintainAspectRatio:false, parsing:false,
+  normalized:true,
   interaction:{ intersect:false, mode:'nearest' },
   scales:{
     x:{ type:'linear', grid:{ color:'#1b222c' }, ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:7, callback:(v)=> new Date(v).toLocaleTimeString('es-CO',{hour12:false}) } },
     y:{ grid:{ color:'#1b222c' } }
   },
-  plugins:{ legend:{ labels:{ boxWidth:9, boxHeight:9, usePointStyle:true } } }
+  plugins:{
+    legend:{ labels:{ boxWidth:9, boxHeight:9, usePointStyle:true } },
+    decimation:{ enabled:true, algorithm:'lttb', samples:120 }
+  }
 };
 
 const mainChart = new Chart($('mainChart'), { type:'line', data:{datasets:[]}, options: chartBaseOpts });
@@ -757,7 +829,37 @@ function renderCommsStatus(){
 renderCommsStatus();
 
 /* ============================================================
-   PARSER DE PAQUETE
+   CRC / CHECKSUM DE PAQUETE
+   Algoritmo: suma de los códigos de carácter de todo el payload
+   (excluyendo el propio campo CRC=...), mod 256, en hex de 2
+   dígitos. Es intencionalmente simple para poder calcularlo
+   igual de fácil en el firmware del ESP32:
+
+     uint8_t crc = 0;
+     for (char c : payload_sin_campo_crc) crc = (crc + (uint8_t)c) % 256;
+     // enviar como CRC=XX (hex, 2 dígitos, mayúsculas)
+
+   Si el paquete no trae campo CRC, se procesa igual (modo
+   compatible con firmware viejo) — el CRC es opcional pero
+   recomendado.
+============================================================ */
+function computeChecksum(payload){
+  let sum = 0;
+  for(let i=0;i<payload.length;i++) sum = (sum + payload.charCodeAt(i)) % 256;
+  return sum.toString(16).toUpperCase().padStart(2,'0');
+}
+
+function verifyChecksum(raw){
+  const m = raw.match(/\|?CRC=([0-9A-Fa-f]{1,2})\|?/);
+  if(!m) return { ok:true, hadCrc:false }; // sin CRC en el paquete: no se bloquea, solo no se valida
+  const received = m[1].toUpperCase().padStart(2,'0');
+  const withoutCrc = raw.replace(m[0], m[0].startsWith('|') && m[0].endsWith('|') ? '|' : '').replace(/\|\|/g,'|').replace(/^\|/,'').replace(/\|$/,'');
+  const expected = computeChecksum(withoutCrc);
+  return { ok: received===expected, hadCrc:true, received, expected };
+}
+
+/* ============================================================
+   PARSER DE PAQUETE:  C1=1.23|C2=2.10|...|IMUX=0.1|RSSI=-71
 ============================================================ */
 function parsePacket(text){
   const out = {};
@@ -777,13 +879,17 @@ function pushHistory(id, val){
 }
 
 function handleIncoming(raw){
-  const now = Date.now();
-  if(!state.hasReceivedData){
-    state.hasReceivedData = true;
-    $('mainChartOverlay').classList.add('hidden');
-    $('imuChartOverlay').classList.add('hidden');
+  // Verificación de integridad antes de tocar cualquier estado — un
+  // paquete corrupto a mitad de camino (bit flip en LoRa) no debe
+  // disparar alertas falsas ni ensuciar el historial.
+  const crc = verifyChecksum(raw);
+  if(crc.hadCrc && !crc.ok){
+    state.msgIn++; $('valMsgIn').textContent = state.msgIn;
+    addLog('err', `Paquete descartado: CRC inválido (esperado ${crc.expected}, recibido ${crc.received})`);
+    return;
   }
 
+  const now = Date.now();
   state.lastPacketRaw = raw;
   state.lastPacketTime = now;
   state.loraOk = true;
@@ -794,16 +900,30 @@ function handleIncoming(raw){
   $('packetTime').textContent = timeStr;
   $('packetBox').textContent = raw;
 
+  if(!firstPacketReceived){
+    firstPacketReceived = true;
+    $('mainChartPlaceholder').classList.add('hidden');
+    $('imuChartPlaceholder').classList.add('hidden');
+  }
+
   const t0 = performance.now();
   const fields = parsePacket(raw);
+
+  if(fields[BATTERY.id] !== undefined){
+    const v = parseFloat(fields[BATTERY.id]);
+    if(!isNaN(v)){
+      state.values[BATTERY.id] = v; state.activeIds.add(BATTERY.id); state.lastUpdate[BATTERY.id] = now;
+      pushHistory(BATTERY.id, v);
+      updateBatteryStrip(v);
+      clearCardLoading(BATTERY.id);
+    }
+  }
 
   [...CORRIENTES, ...ENCODERS_ABS].forEach(s=>{
     if(fields[s.id] !== undefined){
       const v = parseFloat(fields[s.id]);
       if(!isNaN(v)){
-        state.values[s.id] = v; 
-        state.activeIds.add(s.id);
-        state.lastUpdatePerSensor[s.id] = now;
+        state.values[s.id] = v; state.activeIds.add(s.id); state.lastUpdate[s.id] = now;
         pushHistory(s.id, v);
         renderSensorCard(s, v);
         updateSparkline(s.id);
@@ -814,45 +934,22 @@ function handleIncoming(raw){
   ENCODERS_INC.forEach(s=>{
     if(fields[s.id] !== undefined){
       const on = ['1','ON','TRUE','on','true'].includes(fields[s.id]);
-      const prevVal = state.values[s.id];
-      const newVal = on ? 1 : 0;
-      
-      state.values[s.id] = newVal; 
-      state.activeIds.add(s.id);
-      state.lastUpdatePerSensor[s.id] = now;
-      pushHistory(s.id, newVal);
-      renderDigiCard(s, on, prevVal !== undefined && prevVal !== newVal);
+      const prev = state.values[s.id];
+      state.values[s.id] = on?1:0; state.activeIds.add(s.id); state.lastUpdate[s.id] = now;
+      pushHistory(s.id, on?1:0);
+      renderDigiCard(s, on, prev);
     }
   });
 
   IMU_AXES.forEach(a=>{
     if(fields[a.id] !== undefined){
       const v = parseFloat(fields[a.id]);
-      if(!isNaN(v)){ 
-        state.values[a.id]=v; 
-        state.activeIds.add(a.id); 
-        state.lastUpdatePerSensor[a.id] = now;
-        pushHistory(a.id, v); 
-      }
+      if(!isNaN(v)){ state.values[a.id]=v; state.activeIds.add(a.id); state.lastUpdate[a.id] = now; pushHistory(a.id, v); }
     }
   });
   if(fields.IMUX!==undefined) $('valImuX').textContent = parseFloat(fields.IMUX).toFixed(2);
   if(fields.IMUY!==undefined) $('valImuY').textContent = parseFloat(fields.IMUY).toFixed(2);
   if(fields.IMUZ!==undefined) $('valImuZ').textContent = parseFloat(fields.IMUZ).toFixed(2);
-
-  // Batería / Voltaje
-  if(fields.BAT !== undefined || fields.VBAT !== undefined || fields.BAT_VOLT !== undefined){
-    const vBat = parseFloat(fields.BAT || fields.VBAT || fields.BAT_VOLT);
-    if(!isNaN(vBat)){
-      state.batteryVoltage = vBat;
-      $('valBat').textContent = vBat.toFixed(1) + ' V';
-      
-      // Cálculo genérico de porcentaje para batería LiPo 3S (11.1V - 12.6V)
-      const pct = Math.min(100, Math.max(0, Math.round(((vBat - 10.5) / 2.1) * 100)));
-      $('lblBatPct').textContent = `BATERÍA ${pct}%`;
-      $('valBat').style.color = pct < 20 ? 'var(--red)' : pct < 50 ? 'var(--amber)' : 'var(--green)';
-    }
-  }
 
   if(fields.RSSI!==undefined){ $('valRssi').textContent = fields.RSSI+' dBm'; $('heroRssi').textContent = fields.RSSI+' dBm'; }
   if(fields.ESP32M!==undefined) $('infoEsp32M').textContent = fields.ESP32M;
@@ -865,27 +962,65 @@ function handleIncoming(raw){
 
   renderCommsStatus();
   renderAlerts();
-  checkStaleSensors();
-  addLog('mqtt_in', 'Datos recibidos ('+Object.keys(fields).length+' campos)');
+  addLog('mqtt_in', 'Datos recibidos ('+Object.keys(fields).length+' campos)'+(crc.hadCrc?' · CRC OK':''));
+}
+
+// Quita el shimmer de "cargando" de una tarjeta en cuanto le llega
+// su primer dato real (antes se quedaba pegado para siempre).
+function clearCardLoading(id){
+  const card = $('card_'+id);
+  if(card) card.classList.remove('loading','never');
+}
+
+function updateBatteryStrip(v){
+  const pct = Math.max(0, Math.min(100, ((v-BATTERY.min)/(BATTERY.max-BATTERY.min))*100));
+  $('battValue').innerHTML = v.toFixed(2) + ` <span class="batt-unit">${BATTERY.unit}</span>`;
+  $('battGaugeFill').style.width = pct.toFixed(0)+'%';
+  $('battPct').textContent = pct.toFixed(0)+'%';
+  const strip = $('batteryStrip');
+  strip.classList.remove('warn','crit');
+  if(v <= BATTERY.min) strip.classList.add('crit');
+  else if(v <= BATTERY.warn) strip.classList.add('warn');
+  updateBatteryTrend(v);
+}
+
+// Compara el voltaje actual contra el valor de hace ~BATT_TREND_WINDOW_MS
+// en el historial y muestra ↑ / ↓ / — . Usa una "deadband" para no
+// parpadear con el ruido normal de medición.
+function updateBatteryTrend(v){
+  const hist = state.history[BATTERY.id] || [];
+  const cutoff = Date.now() - BATT_TREND_WINDOW_MS;
+  const past = hist.find(p => p.t >= cutoff);
+  const el = $('battTrend');
+  if(!past){ el.textContent = ''; el.className = 'batt-trend'; return; }
+  const delta = v - past.v;
+  if(Math.abs(delta) < BATT_TREND_DEADBAND){
+    el.textContent = '—'; el.className = 'batt-trend flat';
+  } else if(delta > 0){
+    el.textContent = '↑'; el.className = 'batt-trend up';
+  } else {
+    el.textContent = '↓'; el.className = 'batt-trend down';
+  }
 }
 
 function renderSensorCard(s, v){
   const card = $('card_'+s.id);
   const outOfRange = v < s.min || v > s.max;
   card.classList.toggle('alert', outOfRange);
+  card.classList.remove('loading','never');
   $('val_'+s.id).innerHTML = v.toFixed(2) + ` <span class="sc-unit">${s.unit}</span>`;
 }
 
-function renderDigiCard(s, on, stateChanged = false){
-  const card = $('card_'+s.id);
+function renderDigiCard(s, on, prev){
   $('val_'+s.id).textContent = on ? 'ON' : 'OFF';
   $('val_'+s.id).style.color = on ? 'var(--green)' : 'var(--text-dim)';
   $('led_'+s.id).className = 'digi-led ' + (on?'on':'');
-
-  if(stateChanged){
-    card.classList.remove('pulse-anim');
-    void card.offsetWidth; // Force Reflow
-    card.classList.add('pulse-anim');
+  const card = $('card_'+s.id);
+  card.classList.remove('loading','never');
+  if(prev !== undefined && prev !== (on?1:0)){
+    card.classList.remove('pulse');
+    void card.offsetWidth; // reinicia la animación aunque se repita seguido
+    card.classList.add('pulse');
   }
 }
 
@@ -894,6 +1029,10 @@ function renderDigiCard(s, on, stateChanged = false){
 ============================================================ */
 function renderAlerts(){
   const alerts = [];
+  const battV = state.values[BATTERY.id];
+  if(battV !== undefined && battV <= BATTERY.warn){
+    alerts.push(battV <= BATTERY.min ? `Batería crítica (${battV.toFixed(2)} V)` : `Batería baja (${battV.toFixed(2)} V)`);
+  }
   CORRIENTES.concat(ENCODERS_ABS).forEach(s=>{
     const v = state.values[s.id];
     if(v!==undefined && (v<s.min || v>s.max)) alerts.push(`${s.label} fuera de rango (${v.toFixed(2)} ${s.unit})`);
@@ -930,39 +1069,94 @@ client.on('connect', function(){
     if(err) addLog('err','Error suscribiendo a '+TOPIC_DATOS);
     else addLog('sys','Suscrito a '+TOPIC_DATOS);
   });
+  client.subscribe(TOPIC_ACK, function(err){
+    if(err) addLog('err','Error suscribiendo a '+TOPIC_ACK);
+    else addLog('sys','Suscrito a '+TOPIC_ACK);
+  });
 });
 client.on('close', function(){ state.mqttConnected=false; renderCommsStatus(); renderAlerts(); addLog('disc','MQTT desconectado'); });
 client.on('error', function(err){ addLog('err','Error MQTT: '+err.message); });
 client.on('reconnect', function(){ addLog('sys','Intentando reconectar...'); });
-client.on('message', function(topic, message){ handleIncoming(message.toString()); });
+client.on('message', function(topic, message){
+  if(topic === TOPIC_ACK) handleAck(message.toString());
+  else handleIncoming(message.toString());
+});
 
 /* ============================================================
-   ENVÍO DE COMANDOS Y FEEDBACK VISUAL
+   ACK DE COMANDOS
+   El comando enviado incluye un ID único (CMD=<dir>|ID=<id>).
+   El ESP32 debe republicar ese mismo ID en rover/ack cuando lo
+   ejecute, ej: "ID=173882|OK" o "ID=173882|ERR=motor_bloqueado".
+   Si no llega nada en ACK_TIMEOUT_MS, se marca "Sin confirmar"
+   para que quede claro que el broker recibió el mensaje pero no
+   se sabe si el rover realmente se movió.
 ============================================================ */
-function triggerVisualFeedback(el){
-  if(!el) return;
-  el.classList.remove('btn-flash');
-  void el.offsetWidth;
-  el.classList.add('btn-flash');
+function handleAck(raw){
+  const fields = parsePacket(raw);
+  const id = fields.ID;
+  if(!id || !state.pendingCmd || state.pendingCmd.id !== id) return; // ack de un comando viejo/ajeno, se ignora
+
+  clearTimeout(state.pendingCmd.timeoutHandle);
+  const ok = fields.ERR === undefined;
+  const confirmEl = $('lastCmdConfirm');
+  if(ok){
+    confirmEl.textContent = 'Confirmado ' + new Date().toLocaleTimeString('es-CO');
+    confirmEl.className = 'ack-ok';
+    addLog('ack', `Comando ${state.pendingCmd.dir} confirmado por el rover`);
+  } else {
+    confirmEl.textContent = 'Error: ' + fields.ERR;
+    confirmEl.className = 'ack-fail';
+    addLog('err', `El rover rechazó el comando ${state.pendingCmd.dir}: ${fields.ERR}`);
+  }
+  state.pendingCmd = null;
 }
 
-function publishCmd(mensaje){
-  if(!client.connected){ addLog('err','Comando no enviado: MQTT desconectado'); return; }
-  client.publish(TOPIC_COMANDO, mensaje, {qos:0, retain:false}, function(err){
-    if(err){ addLog('err','Error enviando comando: '+mensaje); $('lastCmdConfirm').textContent = 'Falló'; }
-    else{
-      state.msgOut++; $('valMsgOut').textContent = state.msgOut;
-      addLog('mqtt_out','Comando enviado: '+mensaje);
-      $('lastCmdSent').textContent = mensaje;
-      $('lastCmdConfirm').textContent = 'Enviado ' + new Date().toLocaleTimeString('es-CO');
+/* ============================================================
+   ENVÍO DE COMANDOS
+   QoS 1 (no QoS 0): para movimiento de motores nos interesa que
+   el broker confirme la entrega del mensaje, a diferencia de la
+   telemetría donde perder una lectura no importa tanto.
+============================================================ */
+function publishCmd(mensaje, dir){
+  if(!client.connected){ alert('MQTT no está conectado.'); return; }
+
+  const id = Date.now().toString(36) + Math.random().toString(36).substring(2,5);
+  const payload = `CMD=${mensaje}|ID=${id}`;
+
+  if(state.pendingCmd) clearTimeout(state.pendingCmd.timeoutHandle);
+  const confirmEl = $('lastCmdConfirm');
+  confirmEl.textContent = 'Esperando confirmación...';
+  confirmEl.className = 'ack-pending';
+
+  client.publish(TOPIC_COMANDO, payload, {qos:1, retain:false}, function(err){
+    if(err){
+      addLog('err','Error enviando comando: '+mensaje);
+      confirmEl.textContent = 'Falló el envío'; confirmEl.className = 'ack-fail';
+      state.pendingCmd = null;
+      return;
     }
+    state.msgOut++; $('valMsgOut').textContent = state.msgOut;
+    addLog('mqtt_out','Comando enviado: '+mensaje+' (ID '+id+')');
+    $('lastCmdSent').textContent = mensaje;
+
+    const timeoutHandle = setTimeout(()=>{
+      if(state.pendingCmd && state.pendingCmd.id === id){
+        confirmEl.textContent = 'Sin confirmar (timeout)';
+        confirmEl.className = 'ack-fail';
+        addLog('err', `Sin ACK del rover para "${mensaje}" tras ${ACK_TIMEOUT_MS/1000}s`);
+        state.pendingCmd = null;
+      }
+    }, ACK_TIMEOUT_MS);
+
+    state.pendingCmd = { id, dir: mensaje, sentAt: Date.now(), timeoutHandle };
   });
 }
-function sendMove(dir){ publishCmd(dir); $('valRoverState').textContent = dir; }
+function sendMove(dir){ publishCmd(dir, dir); $('valRoverState').textContent = dir; }
 function sendCustomCmd(){
   const el = $('cmdInput'); const v = el.value.trim();
   if(!v){ alert('Escribe un comando primero.'); return; }
-  publishCmd(v); el.value = '';
+  publishCmd(v, v); el.value = '';
+  flashButton($('btnSendCustom'));
 }
 $('cmdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendCustomCmd(); });
 
@@ -971,90 +1165,88 @@ function setMode(mode){
   $('btnAuto').classList.toggle('active', mode==='AUTO');
   $('btnManual').classList.toggle('active', mode==='MANUAL');
   $('modeIndicator').textContent = mode;
-  publishCmd('MODO=' + mode);
+  publishCmd('MODO=' + mode, 'MODO='+mode);
 }
 
 /* ============================================================
-   LÓGICA "MANTENER PRESIONADO = MOVER, SOLTAR = STOP"
-============================================================ */
-let activeHoldBtn = null;
+   BOTONES DE DIRECCIÓN: mantener presionado = moverse,
+   soltar = detenerse automáticamente. Cubre mouse y touch
+   con Pointer Events, además de destello de confirmación.
 
-function handleHoldStart(btn){
-  const cmd = btn.dataset.cmd;
-  if(!cmd) return;
-  activeHoldBtn = btn;
-  btn.classList.add('is-pressed');
-  triggerVisualFeedback(btn);
-  sendMove(cmd);
+   Solo se permite UNA dirección activa a la vez (state.heldDir):
+   si ya hay un botón/tecla presionado y llega otro distinto, se
+   ignora y el botón nuevo se marca visualmente como "bloqueado".
+   Esto evita que dos direcciones opuestas o simultáneas manden
+   comandos que se pisan entre sí. Si el firmware del rover llega
+   a soportar giros en curva (ej. ADELANTE+DERECHA), este es el
+   punto donde habría que resolver la combinación en vez de
+   bloquearla.
+============================================================ */
+function flashButton(el){
+  el.classList.add('sent');
+  setTimeout(()=> el.classList.remove('sent'), 220);
 }
 
-function handleHoldEnd(){
-  if(!activeHoldBtn) return;
-  activeHoldBtn.classList.remove('is-pressed');
-  activeHoldBtn = null;
-  sendMove('STOP');
-}
+const allDirButtons = () => document.querySelectorAll('[data-dir]');
 
-document.querySelectorAll('.hold-btn').forEach(btn => {
-  btn.addEventListener('mousedown', (e) => { e.preventDefault(); handleHoldStart(btn); });
-  btn.addEventListener('touchstart', (e) => { e.preventDefault(); handleHoldStart(btn); }, {passive:false});
-});
-
-window.addEventListener('mouseup', handleHoldEnd);
-window.addEventListener('touchend', handleHoldEnd);
-window.addEventListener('touchcancel', handleHoldEnd);
-
-/* ============================================================
-   CONTROL POR TECLADO EN ESCRITORIO
-============================================================ */
-const keyMap = {
-  'ArrowUp': 'ADELANTE',
-  'ArrowDown': 'ATRAS',
-  'ArrowLeft': 'IZQUIERDA',
-  'ArrowRight': 'DERECHA'
-};
-let pressedKeys = new Set();
-
-window.addEventListener('keydown', (e) => {
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-
-  if (e.code === 'Space') {
-    e.preventDefault();
-    triggerVisualFeedback($('btnStopDesktop'));
-    sendMove('STOP');
+document.querySelectorAll('[data-dir]').forEach(btn=>{
+  const dir = btn.dataset.dir;
+  if(dir === 'STOP'){
+    btn.addEventListener('click', ()=>{
+      state.heldDir = null;
+      allDirButtons().forEach(b=>b.classList.remove('blocked'));
+      sendMove('STOP'); flashButton(btn);
+    });
     return;
   }
-
-  if (keyMap[e.key] && !pressedKeys.has(e.key)) {
+  const start = (e)=>{
     e.preventDefault();
-    pressedKeys.add(e.key);
-    const cmd = keyMap[e.key];
-    const btn = document.querySelector(`.dpad button[data-cmd="${cmd}"]`);
-    if(btn) {
-      btn.classList.add('is-pressed');
-      triggerVisualFeedback(btn);
+    if(state.heldDir && state.heldDir !== dir){
+      // ya hay otra dirección activa: se bloquea esta para no pisarla
+      btn.classList.add('blocked');
+      return;
     }
-    sendMove(cmd);
-  }
+    if(state.heldDir === dir) return;
+    state.heldDir = dir;
+    sendMove(dir);
+    flashButton(btn);
+  };
+  const end = (e)=>{
+    btn.classList.remove('blocked');
+    if(state.heldDir !== dir) return;
+    state.heldDir = null;
+    sendMove('STOP');
+  };
+  btn.addEventListener('pointerdown', start);
+  btn.addEventListener('pointerup', end);
+  btn.addEventListener('pointerleave', end);
+  btn.addEventListener('pointercancel', end);
 });
 
-window.addEventListener('keyup', (e) => {
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-
-  if (keyMap[e.key]) {
-    e.preventDefault();
-    pressedKeys.delete(e.key);
-    const cmd = keyMap[e.key];
-    const btn = document.querySelector(`.dpad button[data-cmd="${cmd}"]`);
-    if(btn) btn.classList.remove('is-pressed');
-
-    if (pressedKeys.size === 0) {
-      sendMove('STOP');
-    } else {
-      const remainingKey = Array.from(pressedKeys).pop();
-      sendMove(keyMap[remainingKey]);
-    }
-  }
+/* ============================================================
+   SOPORTE DE TECLADO PARA CONTROL DESDE ESCRITORIO
+   Misma regla de "una sola dirección a la vez" que los botones.
+============================================================ */
+const KEY_DIR = { ArrowUp:'ADELANTE', ArrowDown:'ATRAS', ArrowLeft:'IZQUIERDA', ArrowRight:'DERECHA', ' ':'STOP' };
+const keyHeld = new Set();
+document.addEventListener('keydown', (e)=>{
+  const dir = KEY_DIR[e.key];
+  if(!dir) return;
+  e.preventDefault();
+  if(dir === 'STOP'){ state.heldDir = null; keyHeld.clear(); sendMove('STOP'); return; }
+  if(keyHeld.has(e.key)) return; // ignora auto-repeat del teclado
+  if(state.heldDir && state.heldDir !== dir) return; // otra dirección ya activa: se ignora
+  keyHeld.add(e.key);
+  state.heldDir = dir;
+  sendMove(dir);
+});
+document.addEventListener('keyup', (e)=>{
+  const dir = KEY_DIR[e.key];
+  if(!dir || dir==='STOP') return;
+  keyHeld.delete(e.key);
+  if(state.heldDir !== dir) return;
+  state.heldDir = null;
+  sendMove('STOP');
 });
 
 /* ============================================================
