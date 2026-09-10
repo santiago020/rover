@@ -4,168 +4,232 @@
 
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
 
-    <title>ROVER - MQTT</title>
+<title>ROVER - MQTT</title>
 
-    <!-- MQTT JavaScript -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-    <style>
+<!-- MQTT -->
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-        * {
-            box-sizing: border-box;
-        }
 
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #101010;
-            color: white;
-        }
+<style>
 
-        header {
-            background: #181818;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid #333;
-        }
+* {
+    box-sizing: border-box;
+}
 
-        header h1 {
-            margin: 0;
-        }
+body {
 
-        .container {
-            max-width: 900px;
-            margin: auto;
-            padding: 20px;
-        }
+    margin: 0;
 
-        .card {
-            background: #181818;
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
+    font-family: Arial, sans-serif;
 
-        .estado {
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
+    background: #101010;
 
-        .desconectado {
-            background: #401515;
-            color: #ff7777;
-        }
+    color: white;
+}
 
-        .conectado {
-            background: #153d20;
-            color: #6cff8a;
-        }
 
-        .dato {
-            background: #0c0c0c;
-            border: 1px solid #333;
-            padding: 20px;
-            border-radius: 8px;
+header {
 
-            font-family: monospace;
-            font-size: 18px;
+    background: #181818;
 
-            word-wrap: break-word;
-            white-space: pre-wrap;
+    padding: 20px;
 
-            min-height: 100px;
-        }
+    text-align: center;
 
-        input {
-            width: 100%;
+    border-bottom: 1px solid #333;
+}
 
-            padding: 14px;
 
-            background: #0c0c0c;
-            color: white;
+header h1 {
 
-            border: 1px solid #444;
-            border-radius: 8px;
+    margin: 0;
+}
 
-            font-size: 16px;
 
-            margin-bottom: 10px;
-        }
+.container {
 
-        button {
-            width: 100%;
+    max-width: 900px;
 
-            padding: 14px;
+    margin: auto;
 
-            background: #333;
-            color: white;
+    padding: 20px;
+}
 
-            border: none;
-            border-radius: 8px;
 
-            font-size: 16px;
-            cursor: pointer;
-        }
+.card {
 
-        button:hover {
-            background: #444;
-        }
+    background: #181818;
 
-        .log {
-            background: #0c0c0c;
+    border: 1px solid #333;
 
-            border: 1px solid #333;
+    border-radius: 12px;
 
-            border-radius: 8px;
+    padding: 20px;
 
-            padding: 15px;
+    margin-bottom: 20px;
+}
 
-            height: 250px;
 
-            overflow-y: auto;
+.estado {
 
-            font-family: monospace;
+    padding: 12px;
 
-            font-size: 13px;
-        }
+    border-radius: 8px;
 
-        .log-line {
-            margin-bottom: 8px;
-        }
+    text-align: center;
 
-        .verde {
-            color: #6cff8a;
-        }
+    font-weight: bold;
 
-        .rojo {
-            color: #ff7777;
-        }
+    margin-bottom: 20px;
+}
 
-        .azul {
-            color: #66b3ff;
-        }
 
-    </style>
+.desconectado {
+
+    background: #401515;
+
+    color: #ff7777;
+}
+
+
+.conectado {
+
+    background: #153d20;
+
+    color: #6cff8a;
+}
+
+
+.dato {
+
+    background: #0c0c0c;
+
+    border: 1px solid #333;
+
+    padding: 20px;
+
+    border-radius: 8px;
+
+    font-family: monospace;
+
+    font-size: 18px;
+
+    word-wrap: break-word;
+
+    white-space: pre-wrap;
+
+    min-height: 100px;
+}
+
+
+input {
+
+    width: 100%;
+
+    padding: 14px;
+
+    background: #0c0c0c;
+
+    color: white;
+
+    border: 1px solid #444;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+
+    margin-bottom: 10px;
+}
+
+
+button {
+
+    width: 100%;
+
+    padding: 14px;
+
+    background: #333;
+
+    color: white;
+
+    border: none;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+
+    cursor: pointer;
+}
+
+
+button:hover {
+
+    background: #444;
+}
+
+
+.log {
+
+    background: #0c0c0c;
+
+    border: 1px solid #333;
+
+    border-radius: 8px;
+
+    padding: 15px;
+
+    height: 250px;
+
+    overflow-y: auto;
+
+    font-family: monospace;
+
+    font-size: 13px;
+}
+
+
+.log-line {
+
+    margin-bottom: 8px;
+}
+
+
+.verde {
+
+    color: #6cff8a;
+}
+
+
+.rojo {
+
+    color: #ff7777;
+}
+
+
+.azul {
+
+    color: #66b3ff;
+}
+
+</style>
 
 </head>
 
 
 <body>
 
+
 <header>
 
-    <h1>🚀 ROVER</h1>
+<h1>🚀 ROVER</h1>
 
-    <p>Telemetría y control mediante MQTT</p>
+<p>Telemetría y control mediante MQTT</p>
 
 </header>
 
@@ -173,89 +237,103 @@
 <div class="container">
 
 
-    <!-- ========================================= -->
-    <!-- ESTADO MQTT -->
-    <!-- ========================================= -->
+<!-- ====================================================== -->
+<!-- ESTADO MQTT -->
+<!-- ====================================================== -->
 
-    <div class="card">
+<div class="card">
 
-        <h2>Estado MQTT</h2>
+<h2>Estado MQTT</h2>
 
-        <div id="estado"
-             class="estado desconectado">
+<div id="estado"
+     class="estado desconectado">
 
-            MQTT DESCONECTADO
+MQTT DESCONECTADO
 
-        </div>
+</div>
 
-    </div>
-
-
-    <!-- ========================================= -->
-    <!-- DATOS DEL ROVER -->
-    <!-- ========================================= -->
-
-    <div class="card">
-
-        <h2>Datos recibidos</h2>
-
-        <p>
-            Topic:
-            <strong>rover/sensores</strong>
-        </p>
-
-        <div id="datos"
-             class="dato">
-
-            Esperando datos del rover...
-
-        </div>
-
-    </div>
+</div>
 
 
-    <!-- ========================================= -->
-    <!-- ENVIAR COMANDO -->
-    <!-- ========================================= -->
+<!-- ====================================================== -->
+<!-- DATOS -->
+<!-- ====================================================== -->
 
-    <div class="card">
+<div class="card">
 
-        <h2>Enviar comando al rover</h2>
+<h2>Datos del Rover</h2>
 
-        <p>
-            Topic:
-            <strong>rover/comando</strong>
-        </p>
+<p>
 
-        <input
-            id="comando"
-            type="text"
-            placeholder="Escribe un comando o texto..."
-        >
+Topic:
 
-        <button onclick="enviarComando()">
+<strong>
+rover/sensores
+</strong>
 
-            ENVIAR AL ROVER
-
-        </button>
-
-    </div>
+</p>
 
 
-    <!-- ========================================= -->
-    <!-- LOG -->
-    <!-- ========================================= -->
+<div id="datos"
+     class="dato">
 
-    <div class="card">
+Esperando datos del rover...
 
-        <h2>Registro</h2>
+</div>
 
-        <div id="log"
-             class="log">
+</div>
 
-        </div>
 
-    </div>
+<!-- ====================================================== -->
+<!-- COMANDO -->
+<!-- ====================================================== -->
+
+<div class="card">
+
+<h2>Enviar comando</h2>
+
+<p>
+
+Topic:
+
+<strong>
+rover/comando
+</strong>
+
+</p>
+
+
+<input
+    id="comando"
+    type="text"
+    placeholder="Escribe un comando..."
+>
+
+
+<button onclick="enviarComando()">
+
+ENVIAR AL ROVER
+
+</button>
+
+</div>
+
+
+<!-- ====================================================== -->
+<!-- LOG -->
+<!-- ====================================================== -->
+
+<div class="card">
+
+<h2>Registro</h2>
+
+
+<div id="log"
+     class="log">
+
+</div>
+
+</div>
 
 
 </div>
@@ -265,30 +343,26 @@
 
 
 // ============================================================
-// CONFIGURACIÓN EMQX
+// CONFIGURACIÓN HIVEMQ
 // ============================================================
 
-// IMPORTANTE:
-//
-// Reemplaza TU_HOST_EMQX por el hostname real de EMQX.
-//
-// Ejemplo:
-//
-// xxxxxxx.ala.eu-central-1.emqxsl.com
-//
-// Para WebSocket seguro:
-// wss://HOST:8084/mqtt
+
+// Host de HiveMQ Cloud
 
 const BROKER =
-    "wss://TU_HOST_EMQX:8084/mqtt";
+    "wss://f9980291ea454f999cbfb77ee79a623b.s1.eu.hivemq.cloud:8884/mqtt";
 
 
-// ============================================================
-// CREDENCIALES
-// ============================================================
+// Usuario
 
-const MQTT_USER = "rover";
-const MQTT_PASSWORD = "Rover2026";
+const MQTT_USER =
+    "rover";
+
+
+// Contraseña
+
+const MQTT_PASSWORD =
+    "Rover2026!";
 
 
 // ============================================================
@@ -298,22 +372,26 @@ const MQTT_PASSWORD = "Rover2026";
 const TOPIC_DATOS =
     "rover/sensores";
 
+
 const TOPIC_COMANDO =
     "rover/comando";
 
 
 // ============================================================
-// ELEMENTOS HTML
+// ELEMENTOS
 // ============================================================
 
 const estado =
     document.getElementById("estado");
 
+
 const datos =
     document.getElementById("datos");
 
+
 const comando =
     document.getElementById("comando");
+
 
 const log =
     document.getElementById("log");
@@ -324,14 +402,16 @@ const log =
 // ============================================================
 
 const CLIENT_ID =
+
     "WEB_ROVER_" +
+
     Math.random()
         .toString(16)
         .substring(2);
 
 
 // ============================================================
-// AGREGAR AL LOG
+// LOG
 // ============================================================
 
 function agregarLog(
@@ -339,19 +419,32 @@ function agregarLog(
     clase = ""
 )
 {
+
     const linea =
         document.createElement("div");
+
 
     linea.className =
         "log-line " + clase;
 
+
     const hora =
-        new Date().toLocaleTimeString();
+        new Date()
+            .toLocaleTimeString();
+
 
     linea.textContent =
-        "[" + hora + "] " + mensaje;
 
-    log.appendChild(linea);
+        "[" +
+        hora +
+        "] " +
+        mensaje;
+
+
+    log.appendChild(
+        linea
+    );
+
 
     log.scrollTop =
         log.scrollHeight;
@@ -359,36 +452,44 @@ function agregarLog(
 
 
 // ============================================================
-// CONECTAR A MQTT
+// CONECTAR
 // ============================================================
 
 agregarLog(
-    "Intentando conectar a EMQX..."
+    "Conectando a HiveMQ..."
 );
 
+
 const client =
+
     mqtt.connect(
         BROKER,
         {
 
-            clientId: CLIENT_ID,
+            clientId:
+                CLIENT_ID,
 
-            username: MQTT_USER,
+            username:
+                MQTT_USER,
 
-            password: MQTT_PASSWORD,
+            password:
+                MQTT_PASSWORD,
 
-            clean: true,
+            clean:
+                true,
 
-            connectTimeout: 10000,
+            connectTimeout:
+                10000,
 
-            reconnectPeriod: 3000
+            reconnectPeriod:
+                3000
 
         }
     );
 
 
 // ============================================================
-// MQTT CONECTADO
+// CONECTADO
 // ============================================================
 
 client.on(
@@ -399,16 +500,20 @@ client.on(
         estado.textContent =
             "MQTT CONECTADO";
 
+
         estado.className =
             "estado conectado";
 
+
         agregarLog(
-            "Conectado a EMQX",
+            "Conectado a HiveMQ",
             "verde"
         );
 
 
-        // Suscribirse a sensores
+        // ----------------------------------------------------
+        // SUSCRIBIRSE A DATOS
+        // ----------------------------------------------------
 
         client.subscribe(
             TOPIC_DATOS,
@@ -419,11 +524,13 @@ client.on(
                 {
 
                     agregarLog(
-                        "Error suscribiendo a sensores",
+                        "Error suscribiendo a " +
+                        TOPIC_DATOS,
                         "rojo"
                     );
 
                 }
+
                 else
                 {
 
@@ -443,7 +550,7 @@ client.on(
 
 
 // ============================================================
-// MQTT DESCONECTADO
+// DESCONECTADO
 // ============================================================
 
 client.on(
@@ -454,8 +561,10 @@ client.on(
         estado.textContent =
             "MQTT DESCONECTADO";
 
+
         estado.className =
             "estado desconectado";
+
 
         agregarLog(
             "MQTT desconectado",
@@ -467,7 +576,7 @@ client.on(
 
 
 // ============================================================
-// ERROR MQTT
+// ERROR
 // ============================================================
 
 client.on(
@@ -486,7 +595,7 @@ client.on(
 
 
 // ============================================================
-// RECONNECT
+// RECONEXIÓN
 // ============================================================
 
 client.on(
@@ -503,7 +612,7 @@ client.on(
 
 
 // ============================================================
-// RECIBIR DATOS DEL ROVER
+// RECIBIR DATOS
 // ============================================================
 
 client.on(
@@ -514,8 +623,6 @@ client.on(
         const texto =
             message.toString();
 
-
-        // Mostrar mensaje completo
 
         datos.textContent =
             texto;
@@ -542,7 +649,9 @@ function enviarComando()
         comando.value.trim();
 
 
-    if (mensaje === "")
+    if (
+        mensaje === ""
+    )
     {
 
         alert(
@@ -554,7 +663,9 @@ function enviarComando()
     }
 
 
-    if (!client.connected)
+    if (
+        !client.connected
+    )
     {
 
         alert(
@@ -566,15 +677,24 @@ function enviarComando()
     }
 
 
-    // Publicar comando
+    // --------------------------------------------------------
+    // PUBLICAR
+    // --------------------------------------------------------
 
     client.publish(
+
         TOPIC_COMANDO,
+
         mensaje,
+
         {
+
             qos: 0,
+
             retain: false
+
         },
+
         function(error)
         {
 
@@ -587,6 +707,7 @@ function enviarComando()
                 );
 
             }
+
             else
             {
 
@@ -602,8 +723,6 @@ function enviarComando()
     );
 
 
-    // Limpiar campo
-
     comando.value = "";
 
 }
@@ -614,11 +733,15 @@ function enviarComando()
 // ============================================================
 
 comando.addEventListener(
+
     "keydown",
+
     function(event)
     {
 
-        if (event.key === "Enter")
+        if (
+            event.key === "Enter"
+        )
         {
 
             enviarComando();
@@ -626,6 +749,7 @@ comando.addEventListener(
         }
 
     }
+
 );
 
 
