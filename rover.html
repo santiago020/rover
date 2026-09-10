@@ -653,12 +653,27 @@ const DEFAULT_CONFIG = {
   topicSensores: "rover/sensores",
   topicComando: "rover/comando",
   topicAck: "rover/ack",
-  };
+};
+
+const CONFIG_VERSION = "2026.09.10_v2";
 
 function loadConfig(){
   try{
+    const savedVer = localStorage.getItem('rover_config_version');
+    if(savedVer !== CONFIG_VERSION){
+      localStorage.removeItem('rover_config');
+      localStorage.setItem('rover_config_version', CONFIG_VERSION);
+      return Object.assign({}, DEFAULT_CONFIG);
+    }
     const saved = JSON.parse(localStorage.getItem('rover_config') || '{}');
-    return Object.assign({}, DEFAULT_CONFIG, saved);
+    const merged = Object.assign({}, DEFAULT_CONFIG);
+    if(saved.broker && saved.broker.trim().startsWith('wss://')) merged.broker = saved.broker.trim();
+    if(saved.user && saved.user.trim()) merged.user = saved.user.trim();
+    if(saved.pass && saved.pass.trim()) merged.pass = saved.pass.trim();
+    if(saved.topicSensores && saved.topicSensores.trim()) merged.topicSensores = saved.topicSensores.trim();
+    if(saved.topicComando && saved.topicComando.trim()) merged.topicComando = saved.topicComando.trim();
+    if(saved.topicAck && saved.topicAck.trim()) merged.topicAck = saved.topicAck.trim();
+    return merged;
   } catch(e){
     return Object.assign({}, DEFAULT_CONFIG);
   }
@@ -687,23 +702,26 @@ function closeSettings(){
 }
 function saveSettings(){
   cfg.broker = $('cfgBroker').value.trim() || DEFAULT_CONFIG.broker;
-  cfg.user = $('cfgUser').value.trim();
-  cfg.pass = $('cfgPass').value;
+  cfg.user = $('cfgUser').value.trim() || DEFAULT_CONFIG.user;
+  cfg.pass = $('cfgPass').value || DEFAULT_CONFIG.pass;
   cfg.topicSensores = $('cfgTopicSensores').value.trim() || DEFAULT_CONFIG.topicSensores;
   cfg.topicComando = $('cfgTopicComando').value.trim() || DEFAULT_CONFIG.topicComando;
   cfg.topicAck = $('cfgTopicAck').value.trim() || DEFAULT_CONFIG.topicAck;
-localStorage.setItem('rover_config', JSON.stringify(cfg));
+  localStorage.setItem('rover_config', JSON.stringify(cfg));
+  localStorage.setItem('rover_config_version', CONFIG_VERSION);
   $('topicComandoVal').textContent = cfg.topicComando;
   closeSettings();
   showToast('Configuración guardada. Reconectando...', 'ok');
   reconnectMqtt();
-  }
+}
 function resetDefaultConfig(){
-  if(confirm('¿Restaurar los parámetros predeterminados?')){
+  if(confirm('¿Restaurar los parámetros predeterminados de conexión?')){
     localStorage.removeItem('rover_config');
+    localStorage.removeItem('rover_config_version');
     cfg = Object.assign({}, DEFAULT_CONFIG);
     applyConfigToUI();
-    showToast('Valores restaurados por defecto', 'info');
+    showToast('Valores restaurados por defecto. Reconectando...', 'info');
+    reconnectMqtt();
   }
 }
 
@@ -1271,40 +1289,62 @@ let client = null;
 
 function connectMqtt(){
   if(isDemoMode) return;
-  addLog('sys','Conectando a broker MQTT...');
-  const clientId = "WEB_ROVER_" + Math.random().toString(16).substring(2);
-  client = mqtt.connect(cfg.broker, {
+  const hostLabel = cfg.broker.replace(/^wss?:\/\//, '').split('/')[0];
+  addLog('sys','Conectando a ' + hostLabel + ' (' + cfg.user + ')...');
+  const clientId = "WEB_ROVER_" + Math.random().toString(16).substring(2, 10);
+  const opts = {
     clientId: clientId,
     username: cfg.user,
     password: cfg.pass,
     clean: true,
+    protocolVersion: 4,
     connectTimeout: 10000,
-    reconnectPeriod: 4000
-  });
+    reconnectPeriod: 4000,
+    keepalive: 30
+  };
+  try {
+    client = mqtt.connect(cfg.broker, opts);
+  } catch(e) {
+    addLog('err', 'Error creando cliente MQTT: ' + e.message);
+    return;
+  }
 
   client.on('connect', function(){
     state.mqttConnected = true;
     state.connectedAt = state.connectedAt || Date.now();
     renderCommsStatus();
     addLog('conn','Conectado al broker MQTT');
-    client.subscribe(cfg.topicSensores, function(err){
+    client.subscribe(cfg.topicSensores, { qos: 0 }, function(err){
       if(err) addLog('err','Error suscribiendo a '+cfg.topicSensores);
       else addLog('sys','Suscrito a '+cfg.topicSensores);
     });
-    client.subscribe(cfg.topicAck, function(err){
+    client.subscribe(cfg.topicAck, { qos: 1 }, function(err){
       if(err) addLog('err','Error suscribiendo a '+cfg.topicAck);
       else addLog('sys','Suscrito a '+cfg.topicAck);
     });
   });
 
   client.on('close', function(){
+    const wasConnected = state.mqttConnected;
     state.mqttConnected = false;
     renderCommsStatus();
     renderAlerts();
-    addLog('disc','MQTT desconectado');
+    if(wasConnected){
+      addLog('disc','MQTT desconectado');
+    } else {
+      addLog('disc','Conexión cerrada. Si persiste, use ⚙️ Ajustes -> Restaurar');
+    }
   });
-  client.on('error', function(err){ addLog('err','Error MQTT: '+err.message); });
-  client.on('reconnect', function(){ addLog('sys','Intentando reconectar...'); });
+  client.on('error', function(err){
+    const msg = err && err.message ? err.message : String(err);
+    addLog('err','Error MQTT: '+msg);
+  });
+  client.on('offline', function(){
+    addLog('disc', 'Cliente MQTT offline');
+  });
+  client.on('reconnect', function(){
+    addLog('sys','Intentando reconectar...');
+  });
   client.on('message', function(topic, message){
     if(topic === cfg.topicAck) handleAck(message.toString());
     else handleIncoming(message.toString());
