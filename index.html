@@ -12,6 +12,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5.15.2/dist/mqtt.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -394,6 +396,85 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
 .toast.info{ border-left:3px solid var(--cyan); }
 .toast.ok{ border-left:3px solid var(--green); }
 .toast.err{ border-left:3px solid var(--red); color:#ffb3ba; }
+
+/* ============ MAPA INTERACTIVO LEAFLET ============ */
+.map-panel{
+  margin-top:16px; position:relative; border-radius:10px; overflow:hidden;
+  border:1px solid var(--line-bright); background:var(--void);
+}
+#roverMap{ width:100%; height:370px; z-index:1; background:#07090d; }
+.map-tools{
+  position:absolute; top:12px; right:12px; z-index:400; display:flex; gap:6px;
+}
+.map-tool-btn{
+  background:rgba(18,24,33,0.92); backdrop-filter:blur(8px);
+  border:1px solid var(--line-bright); color:var(--text); border-radius:6px;
+  padding:6px 12px; font-size:11.5px; font-family:var(--font-ui); cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.5); transition:border-color .15s, background .15s;
+}
+.map-tool-btn:hover{ border-color:var(--cyan); background:var(--panel-raised); }
+.map-hint{
+  position:absolute; bottom:10px; left:12px; z-index:400;
+  background:rgba(7,9,13,0.88); backdrop-filter:blur(6px);
+  border:1px solid var(--line); border-radius:6px; padding:4px 10px;
+  font-size:11px; font-family:var(--font-data); color:var(--text-dim); pointer-events:none;
+}
+.leaflet-popup-content-wrapper{
+  background:var(--panel-raised) !important; color:var(--text) !important;
+  border:1px solid var(--line-bright); border-radius:8px !important;
+  font-family:var(--font-ui); font-size:12px; box-shadow:0 8px 24px rgba(0,0,0,0.6);
+}
+.leaflet-popup-tip{ background:var(--panel-raised) !important; }
+
+/* Marcador Rover: Verde Neón con Radar */
+.rover-marker-pin{
+  position:relative; width:34px; height:34px; border-radius:50%;
+  background:#052e16; border:2.5px solid #00ff88; color:#00ff88;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; box-shadow:0 0 16px rgba(0,255,136,0.7);
+}
+.rover-marker-pulse{
+  position:absolute; inset:-8px; border-radius:50%;
+  border:2px solid #00ff88; opacity:0.85;
+  animation:roverRadar 2s infinite ease-out;
+}
+@keyframes roverRadar{
+  0%{ transform:scale(0.8); opacity:1; }
+  100%{ transform:scale(1.9); opacity:0; }
+}
+
+/* Marcador Estación Base / Usuario: Punto Azul con Glow */
+.user-marker-pin{
+  position:relative; width:26px; height:26px; border-radius:50%;
+  background:#1e3a8a; border:2.5px solid #3b82f6; color:#ffffff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; box-shadow:0 0 14px rgba(59,130,246,0.8);
+}
+.user-marker-pulse{
+  position:absolute; inset:-6px; border-radius:50%;
+  background:rgba(59,130,246,0.4);
+  animation:userPulse 2s infinite ease-out;
+}
+@keyframes userPulse{
+  0%{ transform:scale(0.9); opacity:0.8; }
+  100%{ transform:scale(1.9); opacity:0; }
+}
+
+/* Marcador Home: Cian */
+.home-marker-pin{
+  width:32px; height:32px; border-radius:50%;
+  background:#083344; border:2px solid var(--cyan); color:var(--cyan);
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; box-shadow:0 0 14px rgba(61,219,217,0.7);
+}
+
+/* Marcador Target: Ámbar / Destino */
+.target-marker-pin{
+  width:32px; height:32px; border-radius:50%;
+  background:#451a03; border:2px solid var(--amber); color:var(--amber);
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; box-shadow:0 0 14px rgba(255,176,32,0.7);
+}
 </style>
 </head>
 <body>
@@ -409,6 +490,7 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
   </div>
   <div class="top-status">
     <button class="top-btn" id="btnToggleDemo" onclick="toggleDemoMode()" title="Simula telemetría sin rover conectado">🧪 Modo Demo</button>
+    <button class="top-btn" onclick="openLogModal()" title="Ver registro técnico de eventos">📋 Log</button>
     <button class="top-btn" onclick="openSettings()" title="Ajustes de conexión MQTT y Worker">⚙️ Ajustes</button>
     <div class="chip"><span class="dot off" id="dotMqtt"></span><span id="mqttChipText">MQTT</span></div>
     <div class="chip"><span class="dot off" id="dotLora"></span><span id="loraChipText">LoRa</span></div>
@@ -418,14 +500,12 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
 
 <!-- ================= JUMP NAV ================= -->
 <div class="jumpnav">
+  <a href="#control">Control & Mapa</a>
+  <a href="#imu">IMU</a>
   <a href="#corrientes">Corrientes</a>
   <a href="#encoders-abs">Encoders abs.</a>
   <a href="#encoders-inc">Encoders inc.</a>
-  <a href="#imu">IMU</a>
   <a href="#graficas">Gráficas</a>
-  <a href="#control">Control</a>
-  <a href="#registro">Registro</a>
-  <a href="#paquete">Paquete</a>
   <a href="#estado">Estado del sistema</a>
 </div>
 
@@ -462,94 +542,9 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
     <span id="alertBannerText"><b>Alerta</b> — revisa el estado del sistema.</span>
   </div>
 
-  <!-- ================= CORRIENTES ================= -->
-  <section id="corrientes">
-    <div class="section-head"><h2>Sensores de corriente</h2><span class="n">C1–C10</span></div>
-    <div class="panel"><div class="sensor-grid" id="gridCorrientes"></div></div>
-  </section>
-
-  <!-- ================= ENCODERS ABSOLUTOS ================= -->
-  <section id="encoders-abs">
-    <div class="section-head"><h2>Encoders absolutos</h2><span class="n">EA1–EA6 · posición angular</span></div>
-    <div class="panel"><div class="sensor-grid" id="gridAnalogicas"></div></div>
-  </section>
-
-  <!-- ================= ENCODERS INCREMENTALES ================= -->
-  <section id="encoders-inc">
-    <div class="section-head"><h2>Encoders incrementales</h2><span class="n">EI1–EI4 · pulso digital</span></div>
-    <div class="panel"><div class="digi-grid" id="gridDigitales"></div></div>
-  </section>
-
-  <!-- ================= IMU ================= -->
-  <section id="imu">
-    <div class="section-head"><h2>IMU & Horizonte Artificial</h2><span class="n">orientación · inclinómetro · fuerzas G</span></div>
-    <div class="panel">
-      <div class="imu-visual-container">
-        <div class="imu-grid">
-          <div class="imu-axis x"><div class="axis-lbl">ACEL X (Pitch)</div><div class="axis-val" id="valImuX">0.00</div><div class="axis-sub" id="degPitch">0.0°</div></div>
-          <div class="imu-axis y"><div class="axis-lbl">ACEL Y (Roll)</div><div class="axis-val" id="valImuY">0.00</div><div class="axis-sub" id="degRoll">0.0°</div></div>
-          <div class="imu-axis z"><div class="axis-lbl">ACEL Z (Gravedad)</div><div class="axis-val" id="valImuZ">0.98</div><div class="axis-sub" id="valGForce">1.00 G</div></div>
-          <div class="imu-axis stab" style="border-top-color:var(--green);"><div class="axis-lbl">ESTABILIDAD</div><div class="axis-val" id="valImuStability" style="font-size:14px; color:var(--green); margin-top:6px;">ESTABLE</div><div class="axis-sub" id="valImuAngleMax">Inclinación: 0°</div></div>
-        </div>
-
-        <!-- Indicador Gráfico Horizonte Artificial -->
-        <div class="attitude-card">
-          <div class="attitude-lbl">HORIZONTE ARTIFICIAL</div>
-          <div class="attitude-disk">
-            <div id="horizonPitch" class="attitude-pitch-layer">
-              <div class="horizon-line"></div>
-              <div class="pitch-line pitch-up"></div>
-              <div class="pitch-line pitch-down"></div>
-            </div>
-            <!-- Silueta Retícula del Rover -->
-            <svg class="attitude-crosshair" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="4" fill="none" stroke="var(--amber)" stroke-width="2"/>
-              <line x1="20" y1="50" x2="42" y2="50" stroke="var(--amber)" stroke-width="2.5"/>
-              <line x1="42" y1="50" x2="42" y2="56" stroke="var(--amber)" stroke-width="2.5"/>
-              <line x1="58" y1="50" x2="80" y2="50" stroke="var(--amber)" stroke-width="2.5"/>
-              <line x1="58" y1="50" x2="58" y2="56" stroke="var(--amber)" stroke-width="2.5"/>
-              <line x1="50" y1="18" x2="50" y2="28" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
-            </svg>
-          </div>
-          <div class="attitude-footer">
-            <span>Pitch: <b id="valAttPitch">0°</b></span>
-            <span>Roll: <b id="valAttRoll">0°</b></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-wrap">
-        <canvas id="imuChart"></canvas>
-        <div class="chart-placeholder" id="imuChartPlaceholder">Esperando telemetría...</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= GRAFICAS ================= -->
-  <section id="graficas">
-    <div class="section-head"><h2>Gráficas en tiempo real</h2><span class="n" id="historyCount">0 registros</span></div>
-    <div class="panel">
-      <div class="chart-controls">
-        <select id="chartSelect"></select>
-        <div class="range-btns" id="rangeBtns">
-          <button data-s="30">30 s</button>
-          <button data-s="60" class="active">1 min</button>
-          <button data-s="300">5 min</button>
-          <button data-s="900">15 min</button>
-        </div>
-        <button class="btn ghost" id="btnExportCsv">Exportar CSV</button>
-        <button class="btn danger" id="btnClearChart">Limpiar historial</button>
-      </div>
-      <div class="chart-wrap">
-        <canvas id="mainChart"></canvas>
-        <div class="chart-placeholder" id="mainChartPlaceholder">Esperando telemetría...</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= CONTROL ================= -->
+  <!-- ================= CONTROL & MAPA GPS ================= -->
   <section id="control">
-    <div class="section-head"><h2>Control del rover</h2><span class="n" id="modeIndicator">MANUAL</span></div>
+    <div class="section-head"><h2>Control del rover & Mapa GPS</h2><span class="n" id="modeIndicator">MANUAL</span></div>
     <div class="panel">
       <div class="control-layout">
         <div id="controlModeContent">
@@ -632,33 +627,103 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
         </div>
       </div>
 
-      <div class="field-row">
-        <input type="text" id="cmdInput" placeholder="Comando personalizado (topic rover/comando)...">
-        <button class="btn primary" id="btnSendCustom" onclick="sendCustomCmd()">Enviar</button>
-      </div>
-      <div class="meta-line">
-        <span>Topic: <b id="topicComandoVal">rover/comando</b></span>
-        <span>Último comando: <b id="lastCmdSent">—</b></span>
-        <span>Confirmación: <b id="lastCmdConfirm">—</b></span>
+      <!-- ================= MAPA INTERACTIVO LEAFLET GPS ================= -->
+      <div class="map-panel">
+        <div id="roverMap"></div>
+        <div class="map-tools">
+          <button class="map-tool-btn" onclick="centerMapOnRover()" title="Centrar mapa en la posición del Rover">🤖 Rover</button>
+          <button class="map-tool-btn" onclick="centerMapOnUser()" title="Centrar mapa en mi ubicación actual">📍 Yo</button>
+          <button class="map-tool-btn" onclick="centerMapOnHome()" title="Centrar mapa en punto Home">🏠 Home</button>
+        </div>
+        <div class="map-hint">
+          <span>💡 Toca o haz clic sobre el mapa para fijar un destino</span>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ================= REGISTRO ================= -->
-  <section id="registro">
-    <div class="section-head"><h2>Registro de eventos</h2><button class="btn ghost" style="padding:6px 12px; font-size:11.5px;" onclick="clearLog()">Limpiar</button></div>
-    <div class="panel"><div class="log" id="log"></div></div>
+  <!-- ================= IMU & HORIZONTE ARTIFICIAL ================= -->
+  <section id="imu">
+    <div class="section-head"><h2>IMU & Horizonte Artificial</h2><span class="n">orientación · inclinómetro · fuerzas G</span></div>
+    <div class="panel">
+      <div class="imu-visual-container">
+        <div class="imu-grid">
+          <div class="imu-axis x"><div class="axis-lbl">ACEL X (Pitch)</div><div class="axis-val" id="valImuX">0.00</div><div class="axis-sub" id="degPitch">0.0°</div></div>
+          <div class="imu-axis y"><div class="axis-lbl">ACEL Y (Roll)</div><div class="axis-val" id="valImuY">0.00</div><div class="axis-sub" id="degRoll">0.0°</div></div>
+          <div class="imu-axis z"><div class="axis-lbl">ACEL Z (Gravedad)</div><div class="axis-val" id="valImuZ">0.98</div><div class="axis-sub" id="valGForce">1.00 G</div></div>
+          <div class="imu-axis stab" style="border-top-color:var(--green);"><div class="axis-lbl">ESTABILIDAD</div><div class="axis-val" id="valImuStability" style="font-size:14px; color:var(--green); margin-top:6px;">ESTABLE</div><div class="axis-sub" id="valImuAngleMax">Inclinación: 0°</div></div>
+        </div>
+
+        <!-- Indicador Gráfico Horizonte Artificial -->
+        <div class="attitude-card">
+          <div class="attitude-lbl">HORIZONTE ARTIFICIAL</div>
+          <div class="attitude-disk">
+            <div id="horizonPitch" class="attitude-pitch-layer">
+              <div class="horizon-line"></div>
+              <div class="pitch-line pitch-up"></div>
+              <div class="pitch-line pitch-down"></div>
+            </div>
+            <!-- Silueta Retícula del Rover -->
+            <svg class="attitude-crosshair" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="4" fill="none" stroke="var(--amber)" stroke-width="2"/>
+              <line x1="20" y1="50" x2="42" y2="50" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="42" y1="50" x2="42" y2="56" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="58" y1="50" x2="80" y2="50" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="58" y1="50" x2="58" y2="56" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="50" y1="18" x2="50" y2="28" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="attitude-footer">
+            <span>Pitch: <b id="valAttPitch">0°</b></span>
+            <span>Roll: <b id="valAttRoll">0°</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="imuChart"></canvas>
+        <div class="chart-placeholder" id="imuChartPlaceholder">Esperando telemetría...</div>
+      </div>
+    </div>
   </section>
 
-  <!-- ================= ULTIMO PAQUETE ================= -->
-  <section id="paquete">
-    <div class="section-head"><h2>Último paquete completo</h2></div>
+  <!-- ================= CORRIENTES ================= -->
+  <section id="corrientes">
+    <div class="section-head"><h2>Sensores de corriente</h2><span class="n">C1–C10</span></div>
+    <div class="panel"><div class="sensor-grid" id="gridCorrientes"></div></div>
+  </section>
+
+  <!-- ================= ENCODERS ABSOLUTOS ================= -->
+  <section id="encoders-abs">
+    <div class="section-head"><h2>Encoders absolutos</h2><span class="n">EA1–EA6 · posición angular</span></div>
+    <div class="panel"><div class="sensor-grid" id="gridAnalogicas"></div></div>
+  </section>
+
+  <!-- ================= ENCODERS INCREMENTALES ================= -->
+  <section id="encoders-inc">
+    <div class="section-head"><h2>Encoders incrementales</h2><span class="n">EI1–EI4 · pulso digital</span></div>
+    <div class="panel"><div class="digi-grid" id="gridDigitales"></div></div>
+  </section>
+
+  <!-- ================= GRAFICAS ================= -->
+  <section id="graficas">
+    <div class="section-head"><h2>Gráficas en tiempo real</h2><span class="n" id="historyCount">0 registros</span></div>
     <div class="panel">
-      <div class="packet-head">
-        <span class="packet-time">Recibido: <span id="packetTime">—</span></span>
-        <button class="btn ghost" style="padding:6px 12px; font-size:11.5px;" onclick="copyPacket()">Copiar</button>
+      <div class="chart-controls">
+        <select id="chartSelect"></select>
+        <div class="range-btns" id="rangeBtns">
+          <button data-s="30">30 s</button>
+          <button data-s="60" class="active">1 min</button>
+          <button data-s="300">5 min</button>
+          <button data-s="900">15 min</button>
+        </div>
+        <button class="btn ghost" id="btnExportCsv">Exportar CSV</button>
+        <button class="btn danger" id="btnClearChart">Limpiar historial</button>
       </div>
-      <div class="packet-box" id="packetBox">Esperando datos del rover...</div>
+      <div class="chart-wrap">
+        <canvas id="mainChart"></canvas>
+        <div class="chart-placeholder" id="mainChartPlaceholder">Esperando telemetría...</div>
+      </div>
     </div>
   </section>
 
@@ -736,13 +801,45 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
           <input type="text" id="cfgTopicAck" placeholder="rover/ack">
         </div>
       </div>
+
+      <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="font-size:11.5px; font-weight:600; color:var(--text); font-family:var(--font-data);">📡 Comando Directo (Avanzado)</label>
+          <span style="font-size:11px; color:var(--text-faint); font-family:var(--font-data);">Topic: <b id="topicComandoVal" style="color:var(--cyan);">rover/comando</b></span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="cmdInput" placeholder="Ej: PING, RESET, MODO=AUTO" style="flex:1;">
+          <button class="btn primary" id="btnSendCustom" onclick="sendCustomCmd()">Enviar</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11px; color:var(--text-dim); font-family:var(--font-data);">
+          <span>Último: <b id="lastCmdSent">—</b></span>
+          <span id="lastCmdConfirm" class="ack-ok">—</span>
+        </div>
       </div>
+    </div>
     <div class="modal-foot">
       <button class="btn ghost" onclick="resetDefaultConfig()">Restaurar</button>
       <div style="display:flex; gap:8px;">
         <button class="btn ghost" onclick="closeSettings()">Cancelar</button>
         <button class="btn primary" onclick="saveSettings()">Guardar y Conectar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL LOG TÉCNICO ================= -->
+<div class="modal-backdrop" id="logModal">
+  <div class="modal-card" style="max-width:760px;">
+    <div class="modal-head">
+      <h3>📋 Registro de Eventos (Log Técnico)</h3>
+      <button class="modal-close" onclick="closeLogModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="log" id="log" style="height:380px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="clearLog()">Limpiar registro</button>
+      <button class="btn primary" onclick="closeLogModal()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -791,13 +888,14 @@ const $ = id => document.getElementById(id);
 let isDemoMode = false;
 
 function applyConfigToUI(){
-  $('topicComandoVal').textContent = cfg.topicComando;
-  $('cfgBroker').value = cfg.broker;
-  $('cfgUser').value = cfg.user;
-  $('cfgPass').value = cfg.pass;
-  $('cfgTopicSensores').value = cfg.topicSensores;
-  $('cfgTopicComando').value = cfg.topicComando;
-  $('cfgTopicAck').value = cfg.topicAck;
+  const topCmdEl = $('topicComandoVal');
+  if(topCmdEl) topCmdEl.textContent = cfg.topicComando;
+  if($('cfgBroker')) $('cfgBroker').value = cfg.broker;
+  if($('cfgUser')) $('cfgUser').value = cfg.user;
+  if($('cfgPass')) $('cfgPass').value = cfg.pass;
+  if($('cfgTopicSensores')) $('cfgTopicSensores').value = cfg.topicSensores;
+  if($('cfgTopicComando')) $('cfgTopicComando').value = cfg.topicComando;
+  if($('cfgTopicAck')) $('cfgTopicAck').value = cfg.topicAck;
 }
 
 function openSettings(){
@@ -807,16 +905,29 @@ function openSettings(){
 function closeSettings(){
   $('settingsModal').classList.remove('show');
 }
+function openLogModal(){
+  $('logModal').classList.add('show');
+  const lb = $('log');
+  if(lb) lb.scrollTop = lb.scrollHeight;
+}
+function closeLogModal(){
+  $('logModal').classList.remove('show');
+}
+window.addEventListener('click', e=>{
+  if(e.target === $('settingsModal')) closeSettings();
+  if(e.target === $('logModal')) closeLogModal();
+});
 function saveSettings(){
-  cfg.broker = $('cfgBroker').value.trim() || DEFAULT_CONFIG.broker;
-  cfg.user = $('cfgUser').value.trim() || DEFAULT_CONFIG.user;
-  cfg.pass = $('cfgPass').value || DEFAULT_CONFIG.pass;
-  cfg.topicSensores = $('cfgTopicSensores').value.trim() || DEFAULT_CONFIG.topicSensores;
-  cfg.topicComando = $('cfgTopicComando').value.trim() || DEFAULT_CONFIG.topicComando;
-  cfg.topicAck = $('cfgTopicAck').value.trim() || DEFAULT_CONFIG.topicAck;
+  cfg.broker = ($('cfgBroker') ? $('cfgBroker').value.trim() : '') || DEFAULT_CONFIG.broker;
+  cfg.user = ($('cfgUser') ? $('cfgUser').value.trim() : '') || DEFAULT_CONFIG.user;
+  cfg.pass = ($('cfgPass') ? $('cfgPass').value : '') || DEFAULT_CONFIG.pass;
+  cfg.topicSensores = ($('cfgTopicSensores') ? $('cfgTopicSensores').value.trim() : '') || DEFAULT_CONFIG.topicSensores;
+  cfg.topicComando = ($('cfgTopicComando') ? $('cfgTopicComando').value.trim() : '') || DEFAULT_CONFIG.topicComando;
+  cfg.topicAck = ($('cfgTopicAck') ? $('cfgTopicAck').value.trim() : '') || DEFAULT_CONFIG.topicAck;
   localStorage.setItem('rover_config', JSON.stringify(cfg));
   localStorage.setItem('rover_config_version', CONFIG_VERSION);
-  $('topicComandoVal').textContent = cfg.topicComando;
+  const topCmdEl = $('topicComandoVal');
+  if(topCmdEl) topCmdEl.textContent = cfg.topicComando;
   closeSettings();
   showToast('Configuración guardada. Reconectando...', 'ok');
   reconnectMqtt();
@@ -1243,9 +1354,9 @@ function handleIncoming(raw){
   state.msgIn++;
   $('valMsgIn').textContent = state.msgIn;
   const timeStr = new Date(now).toLocaleTimeString('es-CO');
-  $('heroLastUpdate').textContent = timeStr;
-  $('packetTime').textContent = timeStr;
-  $('packetBox').textContent = raw;
+  const heroLast = $('heroLastUpdate'); if(heroLast) heroLast.textContent = timeStr;
+  const pTime = $('packetTime'); if(pTime) pTime.textContent = timeStr;
+  const pBox = $('packetBox'); if(pBox) pBox.textContent = raw;
 
   if(!firstPacketReceived){
     firstPacketReceived = true;
@@ -1308,9 +1419,11 @@ function handleIncoming(raw){
     if(!isNaN(rLat) && !isNaN(rLon)){
       state.roverLat = rLat;
       state.roverLon = rLon;
-      $('valRoverGps').textContent = `${rLat.toFixed(6)}, ${rLon.toFixed(6)}`;
+      const rGps = $('valRoverGps');
+      if(rGps) rGps.textContent = `${rLat.toFixed(6)}, ${rLon.toFixed(6)}`;
       updateNavDistance();
       updateHomeDistance();
+      updateMapRover(rLat, rLon);
     }
   }
 
@@ -1331,6 +1444,7 @@ function handleIncoming(raw){
       const coordsEl = $('valHomeCoords');
       if(coordsEl){ coordsEl.textContent = `${hLat.toFixed(6)}, ${hLon.toFixed(6)}`; coordsEl.style.color = 'var(--cyan)'; }
       updateHomeDistance();
+      updateMapHome(hLat, hLon);
     }
   }
 
@@ -1607,13 +1721,18 @@ function handleAck(raw){
   clearTimeout(state.pendingCmd.timeoutHandle);
   const ok = fields.ERR === undefined;
   const confirmEl = $('lastCmdConfirm');
+  if(confirmEl){
+    if(ok){
+      confirmEl.textContent = 'Confirmado ' + new Date().toLocaleTimeString('es-CO');
+      confirmEl.className = 'ack-ok';
+    } else {
+      confirmEl.textContent = 'Error: ' + fields.ERR;
+      confirmEl.className = 'ack-fail';
+    }
+  }
   if(ok){
-    confirmEl.textContent = 'Confirmado ' + new Date().toLocaleTimeString('es-CO');
-    confirmEl.className = 'ack-ok';
     addLog('ack', `Comando ${state.pendingCmd.dir} confirmado por el rover`);
   } else {
-    confirmEl.textContent = 'Error: ' + fields.ERR;
-    confirmEl.className = 'ack-fail';
     addLog('err', `El rover rechazó el comando ${state.pendingCmd.dir}: ${fields.ERR}`);
   }
   state.pendingCmd = null;
@@ -1628,14 +1747,16 @@ function publishCmd(mensaje, dir){
 
   if(state.pendingCmd) clearTimeout(state.pendingCmd.timeoutHandle);
   const confirmEl = $('lastCmdConfirm');
-  confirmEl.textContent = 'Esperando confirmación...';
-  confirmEl.className = 'ack-pending';
+  if(confirmEl){
+    confirmEl.textContent = 'Esperando confirmación...';
+    confirmEl.className = 'ack-pending';
+  }
 
   // Simulación en Modo Demo
   if(isDemoMode){
     state.msgOut++; $('valMsgOut').textContent = state.msgOut;
     addLog('demo', 'Comando enviado (simulado): '+mensaje);
-    $('lastCmdSent').textContent = mensaje;
+    const sentEl = $('lastCmdSent'); if(sentEl) sentEl.textContent = mensaje;
     setTimeout(()=>{
       handleAck(`ID=${id}|OK`);
     }, 140);
@@ -1644,8 +1765,7 @@ function publishCmd(mensaje, dir){
 
   if(!client || !client.connected){
     showToast('Broker MQTT no conectado a Internet', 'err');
-    confirmEl.textContent = 'Sin conexión MQTT';
-    confirmEl.className = 'ack-fail';
+    if(confirmEl){ confirmEl.textContent = 'Sin conexión MQTT'; confirmEl.className = 'ack-fail'; }
     return;
   }
 
@@ -1656,18 +1776,17 @@ function publishCmd(mensaje, dir){
   client.publish(cfg.topicComando, payload, {qos:1, retain:false}, function(err){
     if(err){
       addLog('err','Error enviando comando: '+mensaje);
-      confirmEl.textContent = 'Falló el envío'; confirmEl.className = 'ack-fail';
+      if(confirmEl){ confirmEl.textContent = 'Falló el envío'; confirmEl.className = 'ack-fail'; }
       state.pendingCmd = null;
       return;
     }
     state.msgOut++; $('valMsgOut').textContent = state.msgOut;
     addLog('mqtt_out','Comando enviado: '+mensaje+' (ID '+id+')');
-    $('lastCmdSent').textContent = mensaje;
+    const sentEl = $('lastCmdSent'); if(sentEl) sentEl.textContent = mensaje;
 
     const timeoutHandle = setTimeout(()=>{
       if(state.pendingCmd && state.pendingCmd.id === id){
-        confirmEl.textContent = 'Sin confirmar (timeout)';
-        confirmEl.className = 'ack-fail';
+        if(confirmEl){ confirmEl.textContent = 'Sin confirmar (timeout)'; confirmEl.className = 'ack-fail'; }
         addLog('err', `Sin ACK del rover para "${mensaje}" tras ${ACK_TIMEOUT_MS/1000}s`);
         state.pendingCmd = null;
       }
@@ -1720,6 +1839,9 @@ function applyModeToUI(mode){
     navBadge.style.color = mode === 'AUTO' ? 'var(--green)' : 'var(--text-dim)';
     navBadge.style.borderColor = mode === 'AUTO' ? 'var(--green)' : 'var(--line)';
   }
+  if(typeof map !== 'undefined' && map){
+    setTimeout(()=>{ try{ map.invalidateSize(); }catch(_){} }, 150);
+  }
 }
 
 function setMode(mode){
@@ -1756,6 +1878,7 @@ function sendAutoCoords(){
 
   $('valDestCoords').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
   updateNavDistance();
+  updateMapTarget(lat, lon);
 
   // Asegurar que el rover esté en modo AUTO
   if(state.mode !== 'AUTO'){
@@ -1779,8 +1902,11 @@ function fillMyGps(){
     pos => {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
+      userLat = lat;
+      userLon = lon;
       $('inputLat').value = lat.toFixed(6);
       $('inputLon').value = lon.toFixed(6);
+      updateMapUser(lat, lon);
       showToast(`GPS obtenido: ${lat.toFixed(4)}, ${lon.toFixed(4)}`, 'ok');
       flashButton($('btnGetMyGps'));
     },
@@ -1800,6 +1926,7 @@ function clearAutoCoords(){
   localStorage.removeItem('rover_target_lon');
   $('valDestCoords').textContent = '—';
   $('valDistTarget').textContent = '—';
+  updateMapTarget(null, null);
   showToast('Coordenadas de destino borradas', 'info');
   flashButton($('btnClearAutoCoords'));
 }
@@ -1851,6 +1978,7 @@ function setHomeCoords(lat, lon, fuente = 'Personalizado'){
   if(timeEl) timeEl.textContent = nowStr;
 
   updateHomeDistance();
+  updateMapHome(lat, lon);
 
   // Enviar comando al ESP32 para que guarde también el punto Home
   const cmd = `SET_HOME|LAT=${lat.toFixed(6)}|LON=${lon.toFixed(6)}`;
@@ -1900,6 +2028,7 @@ function returnToHome(){
   $('valDestCoords').textContent = `${state.homeLat.toFixed(6)}, ${state.homeLon.toFixed(6)} (HOME)`;
 
   updateNavDistance();
+  updateMapTarget(state.homeLat, state.homeLon);
 
   if(state.mode !== 'AUTO'){
     state.mode = 'AUTO';
@@ -1925,6 +2054,7 @@ function clearHomeCoords(){
   if(timeEl) timeEl.textContent = '—';
   const distEl = $('valDistHome');
   if(distEl) distEl.textContent = '—';
+  updateMapHome(null, null);
   showToast('Punto Home borrado', 'info');
 }
 
@@ -1954,6 +2084,209 @@ function flashButton(el){
   if(!el) return;
   el.classList.add('sent');
   setTimeout(()=> el.classList.remove('sent'), 220);
+}
+
+/* ============================================================
+   MAPA INTERACTIVO LEAFLET GPS (ROVER & USUARIO)
+============================================================ */
+let map = null;
+let roverMarker = null;
+let userMarker = null;
+let homeMarker = null;
+let targetMarker = null;
+let pathLine = null;
+const pathCoords = [];
+let userLat = null, userLon = null;
+
+function initMap(){
+  if(typeof L === 'undefined'){
+    console.warn('Leaflet no está cargado');
+    return;
+  }
+  if(map) return;
+
+  const defaultLat = state.roverLat || 4.609710;
+  const defaultLon = state.roverLon || -74.081750;
+
+  map = L.map('roverMap', {
+    zoomControl: true,
+    attributionControl: true
+  }).setView([defaultLat, defaultLon], 16);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20,
+    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  }).addTo(map);
+
+  pathLine = L.polyline([], {
+    color: '#00ff88',
+    weight: 3,
+    opacity: 0.8,
+    dashArray: '5, 8'
+  }).addTo(map);
+
+  // Click en el mapa para fijar destino
+  map.on('click', function(e){
+    const lat = e.latlng.lat;
+    const lon = e.latlng.lng;
+    $('inputLat').value = lat.toFixed(6);
+    $('inputLon').value = lon.toFixed(6);
+    updateMapTarget(lat, lon);
+    if(state.mode === 'AUTO'){
+      sendAutoCoords();
+    } else {
+      showToast(`Objetivo marcado en mapa: ${lat.toFixed(5)}, ${lon.toFixed(5)}. Cambia a AUTO o pulsa "Enviar Coordenadas"`, 'info');
+    }
+  });
+
+  // Restaurar marcadores guardados si existen
+  if(state.targetLat !== null && state.targetLon !== null){
+    updateMapTarget(state.targetLat, state.targetLon);
+  }
+  if(state.homeLat !== null && state.homeLon !== null){
+    updateMapHome(state.homeLat, state.homeLon);
+  }
+  if(state.roverLat !== null && state.roverLon !== null){
+    updateMapRover(state.roverLat, state.roverLon);
+  }
+
+  // Obtener la posición del operador/usuario (punto azul)
+  locateUser(false);
+
+  // Redimensionar automáticamente tras renderizar
+  setTimeout(()=>{ if(map) map.invalidateSize(); }, 300);
+}
+
+function locateUser(center = false){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLat = pos.coords.latitude;
+    userLon = pos.coords.longitude;
+    updateMapUser(userLat, userLon);
+    if(center && map){
+      map.setView([userLat, userLon], 17, { animate: true });
+    } else if(!state.roverLat && map){
+      map.setView([userLat, userLon], 16);
+    }
+  }, err => {
+    console.log('Geolocalización usuario no disponible:', err.message);
+  }, { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 });
+}
+
+function updateMapUser(lat, lon){
+  if(!map) return;
+  const icon = L.divIcon({
+    className: 'user-marker-wrap',
+    html: '<div class="user-marker-pulse"></div><div class="user-marker-pin"></div>',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -13]
+  });
+  if(userMarker){
+    userMarker.setLatLng([lat, lon]);
+  } else {
+    userMarker = L.marker([lat, lon], { icon: icon }).addTo(map);
+    userMarker.bindPopup('<b>📍 Mi Ubicación (Base)</b><br>' + lat.toFixed(6) + ', ' + lon.toFixed(6));
+  }
+}
+
+function updateMapRover(lat, lon){
+  if(!map) return;
+  const icon = L.divIcon({
+    className: 'rover-marker-wrap',
+    html: '<div class="rover-marker-pulse"></div><div class="rover-marker-pin">🤖</div>',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -17]
+  });
+  if(roverMarker){
+    roverMarker.setLatLng([lat, lon]);
+    if(roverMarker.getPopup()){
+      roverMarker.getPopup().setContent(`<b>🤖 ROVER</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Estado: ${state.roverState || 'OK'}`);
+    }
+  } else {
+    roverMarker = L.marker([lat, lon], { icon: icon, zIndexOffset: 1000 }).addTo(map);
+    roverMarker.bindPopup(`<b>🤖 ROVER</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}<br>Estado: ${state.roverState || 'OK'}`);
+    map.setView([lat, lon], 17);
+  }
+
+  pathCoords.push([lat, lon]);
+  if(pathCoords.length > 500) pathCoords.shift();
+  if(pathLine) pathLine.setLatLngs(pathCoords);
+}
+
+function updateMapTarget(lat, lon){
+  if(!map) return;
+  if(lat === null || lon === null){
+    if(targetMarker){ map.removeLayer(targetMarker); targetMarker = null; }
+    return;
+  }
+  const icon = L.divIcon({
+    className: 'target-marker-wrap',
+    html: '<div class="target-marker-pin">🎯</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+  if(targetMarker){
+    targetMarker.setLatLng([lat, lon]);
+  } else {
+    targetMarker = L.marker([lat, lon], { icon: icon }).addTo(map);
+    targetMarker.bindPopup('<b>🎯 Destino Objetivo</b><br>' + lat.toFixed(6) + ', ' + lon.toFixed(6));
+  }
+}
+
+function updateMapHome(lat, lon){
+  if(!map) return;
+  if(lat === null || lon === null){
+    if(homeMarker){ map.removeLayer(homeMarker); homeMarker = null; }
+    return;
+  }
+  const icon = L.divIcon({
+    className: 'home-marker-wrap',
+    html: '<div class="home-marker-pin">🏠</div>',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+  if(homeMarker){
+    homeMarker.setLatLng([lat, lon]);
+  } else {
+    homeMarker = L.marker([lat, lon], { icon: icon }).addTo(map);
+    homeMarker.bindPopup('<b>🏠 Punto Home (Base)</b><br>' + lat.toFixed(6) + ', ' + lon.toFixed(6));
+  }
+}
+
+function centerMapOnRover(){
+  if(!map) return;
+  if(state.roverLat !== null && state.roverLon !== null){
+    map.setView([state.roverLat, state.roverLon], 18, { animate: true });
+    if(roverMarker) roverMarker.openPopup();
+  } else {
+    showToast('Esperando coordenadas GPS del Rover...', 'warn');
+  }
+}
+
+function centerMapOnUser(){
+  if(!map) return;
+  if(userLat !== null && userLon !== null){
+    map.setView([userLat, userLon], 18, { animate: true });
+    if(userMarker) userMarker.openPopup();
+  } else {
+    showToast('Obteniendo tu ubicación GPS...', 'info');
+    locateUser(true);
+  }
+}
+
+function centerMapOnHome(){
+  if(!map) return;
+  if(state.homeLat !== null && state.homeLon !== null){
+    map.setView([state.homeLat, state.homeLon], 18, { animate: true });
+    if(homeMarker) homeMarker.openPopup();
+  } else {
+    showToast('Punto Home no configurado todavía', 'warn');
+  }
 }
 
 /* ============================================================
@@ -2213,6 +2546,7 @@ applyModeToUI(state.mode || 'MANUAL');
 updateImuVisuals(0, 0, 0.98);
 redrawMainChart();
 renderAlerts();
+initMap();
 connectMqtt();
 </script>
 </body>
