@@ -596,6 +596,28 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
               <span>Posición Rover: <b id="valRoverGps">—</b></span>
               <span>Distancia al objetivo: <b id="valDistTarget">—</b></span>
             </div>
+
+            <!-- ================= GESTIÓN DE PUNTO HOME (BASE REESCRIBIBLE) ================= -->
+            <div class="home-nav-box" style="margin-top:14px; padding:12px 14px; background:var(--panel-raised); border:1px solid var(--cyan-dim); border-left:3px solid var(--cyan); border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+                <span style="font-size:12px; font-weight:600; color:var(--cyan); display:flex; align-items:center; gap:6px;">
+                  🏠 Punto Home (Base de Retorno)
+                </span>
+                <span id="valHomeCoords" style="font-size:11.5px; font-family:var(--font-data); color:var(--text-dim); background:var(--void); padding:3px 9px; border-radius:4px; border:1px solid var(--line);">No configurado</span>
+              </div>
+
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <button class="btn ghost" id="btnSetHomeRover" onclick="setHomeFromRover()" style="padding:7px 12px; font-size:11.5px;" title="Guardar la posición actual del Rover como punto Home">🏠 Fijar Home (Posición Rover)</button>
+                <button class="btn ghost" id="btnSetHomeCustom" onclick="setHomeFromInputs()" style="padding:7px 12px; font-size:11.5px;" title="Guardar las coordenadas de los campos como Home">📌 Fijar Home desde Campos</button>
+                <button class="btn primary" id="btnRTL" onclick="returnToHome()" style="padding:7px 15px; font-size:12px; background:var(--cyan); color:#031b1a; border-color:var(--cyan); font-weight:700;" title="Iniciar regreso autónomo a Home">🚀 Volver a Home (RTL)</button>
+                <button class="btn ghost" onclick="clearHomeCoords()" style="padding:7px 10px; font-size:11px;" title="Borrar punto Home">Borrar</button>
+              </div>
+
+              <div class="meta-line" style="margin-top:10px; font-size:11px;">
+                <span>Distancia a Home: <b id="valDistHome">—</b></span>
+                <span>Guardado: <b id="valHomeSavedAt">—</b></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -846,6 +868,8 @@ const state = {
   heldDir:null,
   targetLat:null, targetLon:null,
   roverLat:null, roverLon:null,
+  homeLat:null, homeLon:null, homeSavedAt:null,
+  vuelcoEmergencia:false,
 };
 ALL_SENSOR_IDS.forEach(id => { state.history[id] = []; });
 
@@ -1286,6 +1310,27 @@ function handleIncoming(raw){
       state.roverLon = rLon;
       $('valRoverGps').textContent = `${rLat.toFixed(6)}, ${rLon.toFixed(6)}`;
       updateNavDistance();
+      updateHomeDistance();
+    }
+  }
+
+  // Comprobar Parada de Emergencia Anti-Vuelco enviada por el ESP32
+  if(fields.VUELCO === '1' || fields.ESTADO === 'EMERGENCIA_VUELCO'){
+    state.vuelcoEmergencia = true;
+  } else if(fields.VUELCO === '0' || (fields.ESTADO && fields.ESTADO !== 'EMERGENCIA_VUELCO')){
+    state.vuelcoEmergencia = false;
+  }
+
+  // Sincronizar coordenadas Home si las reporta el Rover
+  if(fields.HLAT!==undefined && fields.HLON!==undefined){
+    const hLat = parseFloat(fields.HLAT);
+    const hLon = parseFloat(fields.HLON);
+    if(!isNaN(hLat) && !isNaN(hLon) && state.homeLat === null){
+      state.homeLat = hLat;
+      state.homeLon = hLon;
+      const coordsEl = $('valHomeCoords');
+      if(coordsEl){ coordsEl.textContent = `${hLat.toFixed(6)}, ${hLon.toFixed(6)}`; coordsEl.style.color = 'var(--cyan)'; }
+      updateHomeDistance();
     }
   }
 
@@ -1457,8 +1502,10 @@ function renderAlerts(){
   const rssiNum = parseFloat($('valRssi').textContent);
   if(!isNaN(rssiNum) && rssiNum < RSSI_LOW_THRESHOLD) alerts.push(`RSSI LoRa bajo (${rssiNum} dBm)`);
 
-  // 6. Inclinación crítica / Riesgo de vuelco
-  if(state.imuTiltMax !== undefined && state.imuTiltMax >= 30){
+  // 6. Alerta de Inclinación Crítica y Parada de Emergencia en ESP32
+  if(state.vuelcoEmergencia){
+    alerts.push('🚨 CORTE DE EMERGENCIA EN ESP32: Motores apagados por riesgo de vuelco (>35° durante >300ms)');
+  } else if(state.imuTiltMax !== undefined && state.imuTiltMax >= 30){
     alerts.push(`⚠️ Riesgo de vuelco: Inclinación crítica (${state.imuTiltMax.toFixed(1)}°)`);
   }
 
@@ -1777,6 +1824,132 @@ function updateNavDistance(){
   }
 }
 
+/* ============================================================
+   GESTIÓN DE PUNTO HOME (BASE DE RETORNO REESCRIBIBLE) & RTL
+============================================================ */
+function setHomeCoords(lat, lon, fuente = 'Personalizado'){
+  if(lat === null || lon === null || isNaN(lat) || isNaN(lon)){
+    showToast('Coordenadas inválidas para fijar Home', 'err');
+    return;
+  }
+  state.homeLat = lat;
+  state.homeLon = lon;
+  const nowStr = new Date().toLocaleTimeString('es-CO');
+  state.homeSavedAt = nowStr;
+
+  localStorage.setItem('rover_home_lat', lat.toString());
+  localStorage.setItem('rover_home_lon', lon.toString());
+  localStorage.setItem('rover_home_time', nowStr);
+
+  const coordsEl = $('valHomeCoords');
+  if(coordsEl){
+    coordsEl.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+    coordsEl.style.color = 'var(--cyan)';
+    coordsEl.style.borderColor = 'var(--cyan)';
+  }
+  const timeEl = $('valHomeSavedAt');
+  if(timeEl) timeEl.textContent = nowStr;
+
+  updateHomeDistance();
+
+  // Enviar comando al ESP32 para que guarde también el punto Home
+  const cmd = `SET_HOME|LAT=${lat.toFixed(6)}|LON=${lon.toFixed(6)}`;
+  publishCmd(cmd, `SET_HOME -> ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+
+  showToast(`🏠 Punto Home guardado (${fuente}): ${lat.toFixed(5)}, ${lon.toFixed(5)}. (Se puede reescribir cuando quieras)`, 'ok');
+}
+
+function setHomeFromRover(){
+  if(state.roverLat !== null && state.roverLon !== null){
+    setHomeCoords(state.roverLat, state.roverLon, 'Posición actual Rover');
+    flashButton($('btnSetHomeRover'));
+  } else {
+    showToast('Sin posición GPS del Rover todavía. Ingresa coordenadas en los campos o usa "📌 Fijar Home desde Campos"', 'warn');
+  }
+}
+
+function setHomeFromInputs(){
+  const latStr = $('inputLat').value.trim();
+  const lonStr = $('inputLon').value.trim();
+  if(!latStr || !lonStr){
+    showToast('Ingresa Latitud y Longitud en los campos primero', 'err');
+    return;
+  }
+  const lat = parseFloat(latStr);
+  const lon = parseFloat(lonStr);
+  if(isNaN(lat) || lat < -90 || lat > 90 || isNaN(lon) || lon < -180 || lon > 180){
+    showToast('Coordenadas fuera de rango válido', 'err');
+    return;
+  }
+  setHomeCoords(lat, lon, 'Coordenadas escritas');
+  flashButton($('btnSetHomeCustom'));
+}
+
+function returnToHome(){
+  if(state.homeLat === null || state.homeLon === null){
+    showToast('Punto Home no configurado. Pulsa "🏠 Fijar Home" primero.', 'err');
+    return;
+  }
+
+  $('inputLat').value = state.homeLat.toFixed(6);
+  $('inputLon').value = state.homeLon.toFixed(6);
+  state.targetLat = state.homeLat;
+  state.targetLon = state.homeLon;
+  localStorage.setItem('rover_target_lat', state.homeLat.toString());
+  localStorage.setItem('rover_target_lon', state.homeLon.toString());
+  $('valDestCoords').textContent = `${state.homeLat.toFixed(6)}, ${state.homeLon.toFixed(6)} (HOME)`;
+
+  updateNavDistance();
+
+  if(state.mode !== 'AUTO'){
+    state.mode = 'AUTO';
+    applyModeToUI('AUTO');
+  }
+
+  const cmd = `RTL|LAT=${state.homeLat.toFixed(6)}|LON=${state.homeLon.toFixed(6)}`;
+  publishCmd(cmd, `RTL -> HOME (${state.homeLat.toFixed(4)}, ${state.homeLon.toFixed(4)})`);
+  showToast(`🚀 Regreso autónomo a Home iniciado hacia: ${state.homeLat.toFixed(5)}, ${state.homeLon.toFixed(5)}`, 'ok');
+  flashButton($('btnRTL'));
+}
+
+function clearHomeCoords(){
+  state.homeLat = null;
+  state.homeLon = null;
+  state.homeSavedAt = null;
+  localStorage.removeItem('rover_home_lat');
+  localStorage.removeItem('rover_home_lon');
+  localStorage.removeItem('rover_home_time');
+  const coordsEl = $('valHomeCoords');
+  if(coordsEl){ coordsEl.textContent = 'No configurado'; coordsEl.style.color = 'var(--text-dim)'; coordsEl.style.borderColor = 'var(--line)'; }
+  const timeEl = $('valHomeSavedAt');
+  if(timeEl) timeEl.textContent = '—';
+  const distEl = $('valDistHome');
+  if(distEl) distEl.textContent = '—';
+  showToast('Punto Home borrado', 'info');
+}
+
+function updateHomeDistance(){
+  const distEl = $('valDistHome');
+  if(!distEl) return;
+  if(state.homeLat === null || state.homeLon === null || state.roverLat === null || state.roverLon === null){
+    distEl.textContent = '—';
+    return;
+  }
+  const R = 6371000;
+  const dLat = (state.homeLat - state.roverLat) * Math.PI / 180;
+  const dLon = (state.homeLon - state.roverLon) * Math.PI / 180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(state.roverLat*Math.PI/180) * Math.cos(state.homeLat*Math.PI/180) *
+            Math.sin(dLon/2)*Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c;
+  if(d < 1000){
+    distEl.textContent = d.toFixed(1) + ' m';
+  } else {
+    distEl.textContent = (d/1000).toFixed(2) + ' km';
+  }
+}
+
 function flashButton(el){
   if(!el) return;
   el.classList.add('sent');
@@ -1980,6 +2153,14 @@ function generateSyntheticTelemetry(){
     parts.push(`LON=-74.081750`);
   }
 
+  if(state.homeLat !== null && state.homeLon !== null){
+    parts.push(`HLAT=${state.homeLat.toFixed(6)}`);
+    parts.push(`HLON=${state.homeLon.toFixed(6)}`);
+  }
+  if(state.vuelcoEmergencia){
+    parts.push('VUELCO=1');
+  }
+
   const payloadNoCrc = parts.join('|');
   const crc = computeChecksum(payloadNoCrc);
   const fullPacket = `${payloadNoCrc}|CRC=${crc}`;
@@ -1990,7 +2171,7 @@ function generateSyntheticTelemetry(){
 /* ============================================================
    INIT
 ============================================================ */
-// Restaurar coordenadas guardadas si existen
+// Restaurar coordenadas de destino guardadas si existen
 const savedLat = localStorage.getItem('rover_target_lat');
 const savedLon = localStorage.getItem('rover_target_lon');
 if(savedLat && savedLon){
@@ -2002,6 +2183,28 @@ if(savedLat && savedLon){
     $('inputLat').value = lat;
     $('inputLon').value = lon;
     $('valDestCoords').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  }
+}
+
+// Restaurar punto Home guardado si existe (reescribible)
+const savedHomeLat = localStorage.getItem('rover_home_lat');
+const savedHomeLon = localStorage.getItem('rover_home_lon');
+const savedHomeTime = localStorage.getItem('rover_home_time');
+if(savedHomeLat && savedHomeLon){
+  const hLat = parseFloat(savedHomeLat);
+  const hLon = parseFloat(savedHomeLon);
+  if(!isNaN(hLat) && !isNaN(hLon)){
+    state.homeLat = hLat;
+    state.homeLon = hLon;
+    state.homeSavedAt = savedHomeTime || 'Sesión anterior';
+    const coordsEl = $('valHomeCoords');
+    if(coordsEl){
+      coordsEl.textContent = `${hLat.toFixed(6)}, ${hLon.toFixed(6)}`;
+      coordsEl.style.color = 'var(--cyan)';
+      coordsEl.style.borderColor = 'var(--cyan)';
+    }
+    const timeEl = $('valHomeSavedAt');
+    if(timeEl) timeEl.textContent = state.homeSavedAt;
   }
 }
 
