@@ -225,12 +225,27 @@ section{ scroll-margin-top:120px; margin-bottom:30px; }
 }
 .digi-card.pulse{ animation:digiPulse .55s ease-out; }
 
-/* IMU */
-.imu-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:14px; }
-.imu-axis{ background:var(--panel-raised); border-radius:9px; padding:13px; text-align:center; border-top:2px solid var(--line-bright); }
+/* IMU & HORIZONTE ARTIFICIAL */
+.imu-visual-container{ display:grid; grid-template-columns:1fr 220px; gap:12px; margin-bottom:14px; }
+.imu-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:9px; }
+.imu-axis{ background:var(--panel-raised); border-radius:9px; padding:11px 12px; text-align:center; border-top:2px solid var(--line-bright); }
 .imu-axis.x{ border-top-color:#ff5f6d; } .imu-axis.y{ border-top-color:#3ddbd9; } .imu-axis.z{ border-top-color:#ffb020; }
-.imu-axis .axis-lbl{ font-family:var(--font-data); font-size:10.5px; color:var(--text-dim); }
-.imu-axis .axis-val{ font-family:var(--font-data); font-size:22px; font-weight:700; margin-top:3px; }
+.imu-axis .axis-lbl{ font-family:var(--font-data); font-size:10px; color:var(--text-dim); }
+.imu-axis .axis-val{ font-family:var(--font-data); font-size:20px; font-weight:700; margin-top:3px; }
+.imu-axis .axis-sub{ font-family:var(--font-data); font-size:11px; color:var(--text-dim); margin-top:2px; }
+
+.attitude-card{ background:var(--panel-raised); border:1px solid var(--line); border-radius:9px; padding:12px; text-align:center; display:flex; flex-direction:column; justify-content:center; }
+.attitude-lbl{ font-family:var(--font-data); font-size:10px; color:var(--text-dim); letter-spacing:0.6px; margin-bottom:8px; }
+.attitude-disk{ width:120px; height:120px; margin:0 auto; border-radius:50%; border:2px solid var(--line-bright); position:relative; overflow:hidden; background:linear-gradient(to bottom, #112338 50%, #291b10 50%); box-shadow:inset 0 0 10px rgba(0,0,0,0.7); }
+.attitude-pitch-layer{ position:absolute; inset:-40px; transition:transform 0.12s ease-out; }
+.horizon-line{ position:absolute; top:50%; left:0; right:0; height:2px; background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+.pitch-line{ position:absolute; left:30%; right:30%; height:1px; }
+.pitch-line.pitch-up{ top:36%; background:rgba(61,219,217,0.45); }
+.pitch-line.pitch-down{ top:64%; background:rgba(255,176,32,0.45); }
+.attitude-crosshair{ position:absolute; inset:0; pointer-events:none; z-index:2; }
+.attitude-footer{ display:flex; justify-content:space-around; margin-top:8px; font-family:var(--font-data); font-size:11px; color:var(--text-dim); }
+.attitude-footer b{ color:var(--text); }
+@media (max-width:700px){ .imu-visual-container{ grid-template-columns:1fr; } }
 .chart-wrap{ height:230px; position:relative; }
 .chart-placeholder{
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -467,13 +482,42 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
 
   <!-- ================= IMU ================= -->
   <section id="imu">
-    <div class="section-head"><h2>IMU</h2><span class="n">orientación / movimiento</span></div>
+    <div class="section-head"><h2>IMU & Horizonte Artificial</h2><span class="n">orientación · inclinómetro · fuerzas G</span></div>
     <div class="panel">
-      <div class="imu-grid">
-        <div class="imu-axis x"><div class="axis-lbl">X</div><div class="axis-val" id="valImuX">0.00</div></div>
-        <div class="imu-axis y"><div class="axis-lbl">Y</div><div class="axis-val" id="valImuY">0.00</div></div>
-        <div class="imu-axis z"><div class="axis-lbl">Z</div><div class="axis-val" id="valImuZ">0.00</div></div>
+      <div class="imu-visual-container">
+        <div class="imu-grid">
+          <div class="imu-axis x"><div class="axis-lbl">ACEL X (Pitch)</div><div class="axis-val" id="valImuX">0.00</div><div class="axis-sub" id="degPitch">0.0°</div></div>
+          <div class="imu-axis y"><div class="axis-lbl">ACEL Y (Roll)</div><div class="axis-val" id="valImuY">0.00</div><div class="axis-sub" id="degRoll">0.0°</div></div>
+          <div class="imu-axis z"><div class="axis-lbl">ACEL Z (Gravedad)</div><div class="axis-val" id="valImuZ">0.98</div><div class="axis-sub" id="valGForce">1.00 G</div></div>
+          <div class="imu-axis stab" style="border-top-color:var(--green);"><div class="axis-lbl">ESTABILIDAD</div><div class="axis-val" id="valImuStability" style="font-size:14px; color:var(--green); margin-top:6px;">ESTABLE</div><div class="axis-sub" id="valImuAngleMax">Inclinación: 0°</div></div>
+        </div>
+
+        <!-- Indicador Gráfico Horizonte Artificial -->
+        <div class="attitude-card">
+          <div class="attitude-lbl">HORIZONTE ARTIFICIAL</div>
+          <div class="attitude-disk">
+            <div id="horizonPitch" class="attitude-pitch-layer">
+              <div class="horizon-line"></div>
+              <div class="pitch-line pitch-up"></div>
+              <div class="pitch-line pitch-down"></div>
+            </div>
+            <!-- Silueta Retícula del Rover -->
+            <svg class="attitude-crosshair" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="4" fill="none" stroke="var(--amber)" stroke-width="2"/>
+              <line x1="20" y1="50" x2="42" y2="50" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="42" y1="50" x2="42" y2="56" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="58" y1="50" x2="80" y2="50" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="58" y1="50" x2="58" y2="56" stroke="var(--amber)" stroke-width="2.5"/>
+              <line x1="50" y1="18" x2="50" y2="28" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="attitude-footer">
+            <span>Pitch: <b id="valAttPitch">0°</b></span>
+            <span>Roll: <b id="valAttRoll">0°</b></span>
+          </div>
+        </div>
       </div>
+
       <div class="chart-wrap">
         <canvas id="imuChart"></canvas>
         <div class="chart-placeholder" id="imuChartPlaceholder">Esperando telemetría...</div>
@@ -508,16 +552,53 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
     <div class="section-head"><h2>Control del rover</h2><span class="n" id="modeIndicator">MANUAL</span></div>
     <div class="panel">
       <div class="control-layout">
-        <div>
-          <div class="dpad">
-            <button class="fwd" data-dir="ADELANTE" aria-label="Avanzar">⬆️</button>
-            <button class="left" data-dir="IZQUIERDA" aria-label="Girar a la izquierda">⬅️</button>
-            <button class="stop" data-dir="STOP" aria-label="Detener">🛑</button>
-            <button class="right" data-dir="DERECHA" aria-label="Girar a la derecha">➡️</button>
-            <button class="back" data-dir="ATRAS" aria-label="Retroceder">⬇️</button>
+        <div id="controlModeContent">
+          <!-- Modo Manual: D-Pad y flechas -->
+          <div id="manualControlBox">
+            <div class="dpad">
+              <button class="fwd" data-dir="ADELANTE" aria-label="Avanzar">⬆️</button>
+              <button class="left" data-dir="IZQUIERDA" aria-label="Girar a la izquierda">⬅️</button>
+              <button class="stop" data-dir="STOP" aria-label="Detener">🛑</button>
+              <button class="right" data-dir="DERECHA" aria-label="Girar a la derecha">➡️</button>
+              <button class="back" data-dir="ATRAS" aria-label="Retroceder">⬇️</button>
+            </div>
+            <div class="kbd-hint">Mantén presionado para moverte · o usa <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>espacio</kbd> para parar</div>
           </div>
-          <div class="kbd-hint">Mantén presionado para moverte · o usa <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>espacio</kbd> para parar</div>
+
+          <!-- Modo Auto: Destino GPS (Latitud / Longitud) -->
+          <div class="auto-nav-box" id="autoNavBox" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+              <div class="section-sub" style="margin:0; display:flex; align-items:center; gap:6px;">
+                <span>📍 Navegación Automática (Destino GPS)</span>
+              </div>
+              <span class="chip-sm" id="navBadgeMode" style="background:var(--panel-raised); border:1px solid var(--green); border-radius:6px; padding:3px 9px; font-size:11px; font-family:var(--font-data); color:var(--green);">🤖 MODO AUTO ACTIVO</span>
+            </div>
+
+            <div class="field-grid-2" style="margin-bottom:12px;">
+              <div>
+                <label style="display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); margin-bottom:5px;">Latitud Objetivo (°)</label>
+                <input type="number" id="inputLat" step="any" placeholder="Ej: 4.609710" style="width:100%; background:var(--void); border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-family:var(--font-data); font-size:13px;">
+              </div>
+              <div>
+                <label style="display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); margin-bottom:5px;">Longitud Objetivo (°)</label>
+                <input type="number" id="inputLon" step="any" placeholder="Ej: -74.081750" style="width:100%; background:var(--void); border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-family:var(--font-data); font-size:13px;">
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button class="btn primary" id="btnSendAutoCoords" onclick="sendAutoCoords()" style="padding:9px 16px; font-size:12.5px;">🎯 Enviar Coordenadas al Rover</button>
+              <button class="btn ghost" id="btnGetMyGps" onclick="fillMyGps()" style="padding:9px 14px; font-size:12px;" title="Obtener coordenadas GPS de este dispositivo">📍 Mi ubicación GPS</button>
+              <button class="btn ghost" id="btnClearAutoCoords" onclick="clearAutoCoords()" style="padding:9px 12px; font-size:12px;">Limpiar</button>
+            </div>
+
+            <div class="meta-line" style="margin-top:14px; padding:10px 12px; background:var(--void); border:1px solid var(--line); border-radius:8px;">
+              <span>Destino configurado: <b id="valDestCoords">—</b></span>
+              <span>Posición Rover: <b id="valRoverGps">—</b></span>
+              <span>Distancia al objetivo: <b id="valDistTarget">—</b></span>
+            </div>
+          </div>
         </div>
+
         <div>
           <div class="section-sub">Modo de operación</div>
           <div class="mode-toggle">
@@ -526,39 +607,6 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
           </div>
           <div class="section-sub" style="margin-top:16px;">Estado actual</div>
           <div style="font-family:var(--font-data); font-size:15px; margin-top:6px; font-weight:600;" id="valRoverState">DETENIDO</div>
-        </div>
-      </div>
-
-      <!-- ================= CONTROL AUTOMÁTICO: COORDENADAS GPS ================= -->
-      <div class="auto-nav-box" id="autoNavBox" style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-          <div class="section-sub" style="margin:0; display:flex; align-items:center; gap:6px;">
-            <span>📍 Navegación Automática (Destino GPS)</span>
-          </div>
-          <span class="chip-sm" id="navBadgeMode" style="background:var(--panel-raised); border:1px solid var(--line); border-radius:6px; padding:3px 9px; font-size:11px; font-family:var(--font-data); color:var(--text-dim);">MODO MANUAL</span>
-        </div>
-
-        <div class="field-grid-2" style="margin-bottom:10px;">
-          <div>
-            <label style="display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); margin-bottom:5px;">Latitud Objetivo (°)</label>
-            <input type="number" id="inputLat" step="any" placeholder="Ej: 4.609710" style="width:100%; background:var(--void); border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-family:var(--font-data); font-size:13px;">
-          </div>
-          <div>
-            <label style="display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); margin-bottom:5px;">Longitud Objetivo (°)</label>
-            <input type="number" id="inputLon" step="any" placeholder="Ej: -74.081750" style="width:100%; background:var(--void); border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-family:var(--font-data); font-size:13px;">
-          </div>
-        </div>
-
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <button class="btn primary" id="btnSendAutoCoords" onclick="sendAutoCoords()" style="padding:8px 16px; font-size:12.5px;">🎯 Enviar Coordenadas al Rover</button>
-          <button class="btn ghost" id="btnGetMyGps" onclick="fillMyGps()" style="padding:8px 14px; font-size:12px;" title="Obtener coordenadas GPS de este dispositivo">📍 Mi ubicación GPS</button>
-          <button class="btn ghost" id="btnClearAutoCoords" onclick="clearAutoCoords()" style="padding:8px 12px; font-size:12px;">Limpiar</button>
-        </div>
-
-        <div class="meta-line" style="margin-top:12px;">
-          <span>Destino configurado: <b id="valDestCoords">—</b></span>
-          <span>Posición Rover: <b id="valRoverGps">—</b></span>
-          <span>Distancia al objetivo: <b id="valDistTarget">—</b></span>
         </div>
       </div>
 
@@ -617,11 +665,14 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
 
 <!-- ================= MOBILE STICKY BAR ================= -->
 <div class="mobile-bar">
-  <div class="mini-dpad">
+  <div class="mini-dpad" id="mobileMiniDpad">
     <button class="f" data-dir="ADELANTE" aria-label="Avanzar">⬆</button>
     <button class="l" data-dir="IZQUIERDA" aria-label="Girar a la izquierda">⬅</button>
     <button class="r" data-dir="DERECHA" aria-label="Girar a la derecha">➡</button>
     <button class="b" data-dir="ATRAS" aria-label="Retroceder">⬇</button>
+  </div>
+  <div id="mobileAutoNotice" style="display:none; flex:1; font-size:12px; color:var(--amber); font-family:var(--font-ui); text-align:center; padding:8px 10px; background:var(--panel-raised); border:1px solid var(--line); border-radius:8px;">
+    🤖 Navegación Auto Activa
   </div>
   <button class="mobile-stop" data-dir="STOP" aria-label="Detener">🛑 STOP</button>
 </div>
@@ -1222,6 +1273,11 @@ function handleIncoming(raw){
   if(fields.IMUY!==undefined) $('valImuY').textContent = parseFloat(fields.IMUY).toFixed(2);
   if(fields.IMUZ!==undefined) $('valImuZ').textContent = parseFloat(fields.IMUZ).toFixed(2);
 
+  const curAx = state.values.IMUX !== undefined ? state.values.IMUX : 0;
+  const curAy = state.values.IMUY !== undefined ? state.values.IMUY : 0;
+  const curAz = state.values.IMUZ !== undefined ? state.values.IMUZ : 0.98;
+  updateImuVisuals(curAx, curAy, curAz);
+
   if(fields.LAT!==undefined && fields.LON!==undefined){
     const rLat = parseFloat(fields.LAT);
     const rLon = parseFloat(fields.LON);
@@ -1241,15 +1297,7 @@ function handleIncoming(raw){
     const m = fields.MODO.trim().toUpperCase();
     if(m === 'AUTO' || m === 'MANUAL'){
       state.mode = m;
-      $('btnAuto').classList.toggle('active', m==='AUTO');
-      $('btnManual').classList.toggle('active', m==='MANUAL');
-      $('modeIndicator').textContent = m;
-      const navBadge = $('navBadgeMode');
-      if(navBadge){
-        navBadge.textContent = m === 'AUTO' ? '🤖 MODO AUTO ACTIVO' : '🎮 MODO MANUAL';
-        navBadge.style.color = m === 'AUTO' ? 'var(--green)' : 'var(--text-dim)';
-        navBadge.style.borderColor = m === 'AUTO' ? 'var(--green)' : 'var(--line)';
-      }
+      applyModeToUI(m);
     }
   }
 
@@ -1319,6 +1367,61 @@ function renderDigiCard(s, on, prev){
 }
 
 /* ============================================================
+   IMU & HORIZONTE ARTIFICIAL (INCLINÓMETRO)
+============================================================ */
+function updateImuVisuals(ax, ay, az){
+  // Roll: rotación lateral en torno al eje longitudinal (Y vs Z)
+  const rollRad = Math.atan2(ay, az);
+  const rollDeg = rollRad * (180 / Math.PI);
+
+  // Pitch: inclinación hacia adelante / atrás (X vs plano YZ)
+  const pitchRad = Math.atan2(-ax, Math.sqrt(ay * ay + az * az));
+  const pitchDeg = pitchRad * (180 / Math.PI);
+
+  // Gravedad total y ángulo combinado de inclinación
+  const gForce = Math.sqrt(ax * ax + ay * ay + az * az);
+  const tiltMax = Math.sqrt(pitchDeg * pitchDeg + rollDeg * rollDeg);
+  state.imuTiltMax = tiltMax;
+
+  // Actualizar valores en pantalla
+  const elPitch = $('degPitch'); if(elPitch) elPitch.textContent = (pitchDeg >= 0 ? '+' : '') + pitchDeg.toFixed(1) + '°';
+  const elRoll = $('degRoll'); if(elRoll) elRoll.textContent = (rollDeg >= 0 ? '+' : '') + rollDeg.toFixed(1) + '°';
+  const elG = $('valGForce'); if(elG) elG.textContent = gForce.toFixed(2) + ' G';
+
+  const elAttPitch = $('valAttPitch'); if(elAttPitch) elAttPitch.textContent = (pitchDeg >= 0 ? '+' : '') + pitchDeg.toFixed(1) + '°';
+  const elAttRoll = $('valAttRoll'); if(elAttRoll) elAttRoll.textContent = (rollDeg >= 0 ? '+' : '') + rollDeg.toFixed(1) + '°';
+
+  // Diagnóstico de estabilidad y riesgo de vuelco
+  const stabEl = $('valImuStability');
+  const angleMaxEl = $('valImuAngleMax');
+  const stabAxis = stabEl ? stabEl.closest('.imu-axis') : null;
+
+  if(stabEl && angleMaxEl){
+    angleMaxEl.textContent = 'Inclinación: ' + tiltMax.toFixed(1) + '°';
+    if(tiltMax >= 30){
+      stabEl.textContent = '⚠️ RIESGO VUELCO';
+      stabEl.style.color = 'var(--red)';
+      if(stabAxis) stabAxis.style.borderTopColor = 'var(--red)';
+    } else if(tiltMax >= 15){
+      stabEl.textContent = '⚡ INCLINADO';
+      stabEl.style.color = 'var(--amber)';
+      if(stabAxis) stabAxis.style.borderTopColor = 'var(--amber)';
+    } else {
+      stabEl.textContent = 'ESTABLE';
+      stabEl.style.color = 'var(--green)';
+      if(stabAxis) stabAxis.style.borderTopColor = 'var(--green)';
+    }
+  }
+
+  // Horizonte artificial (rotación por Roll y desplazamiento por Pitch)
+  const horizon = $('horizonPitch');
+  if(horizon){
+    const pitchTranslate = Math.max(-38, Math.min(38, pitchDeg * 1.1));
+    horizon.style.transform = `rotate(${-rollDeg.toFixed(1)}deg) translateY(${pitchTranslate.toFixed(1)}px)`;
+  }
+}
+
+/* ============================================================
    ALERTAS
 ============================================================ */
 function renderAlerts(){
@@ -1353,6 +1456,11 @@ function renderAlerts(){
   // 5. Señal RSSI
   const rssiNum = parseFloat($('valRssi').textContent);
   if(!isNaN(rssiNum) && rssiNum < RSSI_LOW_THRESHOLD) alerts.push(`RSSI LoRa bajo (${rssiNum} dBm)`);
+
+  // 6. Inclinación crítica / Riesgo de vuelco
+  if(state.imuTiltMax !== undefined && state.imuTiltMax >= 30){
+    alerts.push(`⚠️ Riesgo de vuelco: Inclinación crítica (${state.imuTiltMax.toFixed(1)}°)`);
+  }
 
   const banner = $('alertBanner');
   if(alerts.length===0){
@@ -1537,17 +1645,39 @@ function sendCustomCmd(){
 }
 $('cmdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendCustomCmd(); });
 
-function setMode(mode){
-  state.mode = mode;
+function applyModeToUI(mode){
   $('btnAuto').classList.toggle('active', mode==='AUTO');
   $('btnManual').classList.toggle('active', mode==='MANUAL');
   $('modeIndicator').textContent = mode;
+
+  const manualBox = $('manualControlBox');
+  const autoBox = $('autoNavBox');
+  const miniDpad = $('mobileMiniDpad');
+  const mobileNotice = $('mobileAutoNotice');
+
+  if(mode === 'AUTO'){
+    if(manualBox) manualBox.style.display = 'none';
+    if(autoBox) autoBox.style.display = 'block';
+    if(miniDpad) miniDpad.style.display = 'none';
+    if(mobileNotice) mobileNotice.style.display = 'block';
+  } else {
+    if(manualBox) manualBox.style.display = 'block';
+    if(autoBox) autoBox.style.display = 'none';
+    if(miniDpad) miniDpad.style.display = 'grid';
+    if(mobileNotice) mobileNotice.style.display = 'none';
+  }
+
   const navBadge = $('navBadgeMode');
   if(navBadge){
     navBadge.textContent = mode === 'AUTO' ? '🤖 MODO AUTO ACTIVO' : '🎮 MODO MANUAL';
     navBadge.style.color = mode === 'AUTO' ? 'var(--green)' : 'var(--text-dim)';
     navBadge.style.borderColor = mode === 'AUTO' ? 'var(--green)' : 'var(--line)';
   }
+}
+
+function setMode(mode){
+  state.mode = mode;
+  applyModeToUI(mode);
   publishCmd('MODO=' + mode, 'MODO='+mode);
 }
 
@@ -1583,15 +1713,7 @@ function sendAutoCoords(){
   // Asegurar que el rover esté en modo AUTO
   if(state.mode !== 'AUTO'){
     state.mode = 'AUTO';
-    $('btnAuto').classList.add('active');
-    $('btnManual').classList.remove('active');
-    $('modeIndicator').textContent = 'AUTO';
-    const navBadge = $('navBadgeMode');
-    if(navBadge){
-      navBadge.textContent = '🤖 MODO AUTO ACTIVO';
-      navBadge.style.color = 'var(--green)';
-      navBadge.style.borderColor = 'var(--green)';
-    }
+    applyModeToUI('AUTO');
   }
 
   const cmd = `NAV_AUTO|LAT=${lat.toFixed(6)}|LON=${lon.toFixed(6)}`;
@@ -1720,6 +1842,10 @@ document.addEventListener('keydown', (e)=>{
   e.preventDefault();
   if(dir === 'STOP'){
     state.heldDir = null; keyHeld.clear(); sendMove('STOP');
+    return;
+  }
+  if(state.mode === 'AUTO'){
+    showToast('Flechas manuales bloqueadas en Modo Auto (Usa espacio para STOP)', 'warn');
     return;
   }
   if(keyHeld.has(e.key)) return;
@@ -1880,6 +2006,8 @@ if(savedLat && savedLon){
 }
 
 applyConfigToUI();
+applyModeToUI(state.mode || 'MANUAL');
+updateImuVisuals(0, 0, 0.98);
 redrawMainChart();
 renderAlerts();
 connectMqtt();
