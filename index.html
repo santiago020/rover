@@ -1394,6 +1394,7 @@ function connectMqtt(){
     state.mqttConnected = true;
     state.connectedAt = state.connectedAt || Date.now();
     renderCommsStatus();
+    renderAlerts();
     addLog('conn','Conectado al broker MQTT');
     client.subscribe(cfg.topicSensores, { qos: 0 }, function(err){
       if(err) addLog('err','Error suscribiendo a '+cfg.topicSensores);
