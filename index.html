@@ -528,6 +528,40 @@ input:focus-visible, .range-btns button:focus-visible, .jumpnav a:focus-visible,
           <div style="font-family:var(--font-data); font-size:15px; margin-top:6px; font-weight:600;" id="valRoverState">DETENIDO</div>
         </div>
       </div>
+
+      <!-- ================= CONTROL AUTOMÁTICO: COORDENADAS GPS ================= -->
+      <div class="auto-nav-box" id="autoNavBox" style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <div class="section-sub" style="margin:0; display:flex; align-items:center; gap:6px;">
+            <span>📍 Navegación Automática (Destino GPS)</span>
+          </div>
+          <span class="chip-sm" id="navBadgeMode" style="background:var(--panel-raised); border:1px solid var(--line); border-radius:6px; padding:3px 9px; font-size:11px; font-family:var(--font-data); color:var(--text-dim);">MODO MANUAL</span>
+        </div>
+
+        <div class="field-grid-2" style="margin-bottom:10px;">
+          <div>
+            <label style="display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); margin-bottom:5px;">Latitud Objetivo (°)</label>
+            <input type="number" id="inputLat" step="any" placeholder="Ej: 4.609710" style="width:100%; background:var(--void); border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-family:var(--font-data); font-size:13px;">
+          </div>
+          <div>
+            <label style="display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); margin-bottom:5px;">Longitud Objetivo (°)</label>
+            <input type="number" id="inputLon" step="any" placeholder="Ej: -74.081750" style="width:100%; background:var(--void); border:1px solid var(--line); border-radius:6px; padding:9px 12px; color:var(--text); font-family:var(--font-data); font-size:13px;">
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <button class="btn primary" id="btnSendAutoCoords" onclick="sendAutoCoords()" style="padding:8px 16px; font-size:12.5px;">🎯 Enviar Coordenadas al Rover</button>
+          <button class="btn ghost" id="btnGetMyGps" onclick="fillMyGps()" style="padding:8px 14px; font-size:12px;" title="Obtener coordenadas GPS de este dispositivo">📍 Mi ubicación GPS</button>
+          <button class="btn ghost" id="btnClearAutoCoords" onclick="clearAutoCoords()" style="padding:8px 12px; font-size:12px;">Limpiar</button>
+        </div>
+
+        <div class="meta-line" style="margin-top:12px;">
+          <span>Destino configurado: <b id="valDestCoords">—</b></span>
+          <span>Posición Rover: <b id="valRoverGps">—</b></span>
+          <span>Distancia al objetivo: <b id="valDistTarget">—</b></span>
+        </div>
+      </div>
+
       <div class="field-row">
         <input type="text" id="cmdInput" placeholder="Comando personalizado (topic rover/comando)...">
         <button class="btn primary" id="btnSendCustom" onclick="sendCustomCmd()">Enviar</button>
@@ -759,6 +793,8 @@ const state = {
   mode:'MANUAL', roverState:'DETENIDO',
   pendingCmd:null,
   heldDir:null,
+  targetLat:null, targetLon:null,
+  roverLat:null, roverLon:null,
 };
 ALL_SENSOR_IDS.forEach(id => { state.history[id] = []; });
 
@@ -802,12 +838,20 @@ function updateSinceLast(){
 }
 
 function checkLoraTimeout(){
-  if(!state.lastPacketTime) return;
+  if(!state.lastPacketTime){
+    if(state.loraOk){
+      state.loraOk = false;
+      renderCommsStatus();
+      renderAlerts();
+    }
+    return;
+  }
   const shouldBeOk = (Date.now()-state.lastPacketTime) < LORA_TIMEOUT_MS;
   if(shouldBeOk !== state.loraOk){
     state.loraOk = shouldBeOk;
     renderCommsStatus();
-    if(!shouldBeOk) addLog('sys','Sin señal LoRa (timeout de paquetes)');
+    if(!shouldBeOk) addLog('sys','Pérdida de señal LoRa con el Rover (timeout de paquetes)');
+    else addLog('conn','Señal LoRa restablecida con el Rover');
   }
   renderAlerts();
 }
@@ -1018,7 +1062,9 @@ function renderCommsStatus(){
   $('statLora').className = 'stat ' + (state.loraOk?'ok':'bad');
 
   let sysText = state.mqttConnected && state.loraOk ? 'OPERATIVO'
-    : state.mqttConnected ? 'SIN ENLACE LORA' : 'DESCONECTADO';
+    : state.mqttConnected ? 'MQTT OK · SIN ENLACE LORA'
+    : state.loraOk ? 'LORA OK · MQTT DESCONECTADO'
+    : 'SIN CONEXIÓN';
   $('systemStateText').textContent = sysText;
 }
 renderCommsStatus();
@@ -1176,6 +1222,17 @@ function handleIncoming(raw){
   if(fields.IMUY!==undefined) $('valImuY').textContent = parseFloat(fields.IMUY).toFixed(2);
   if(fields.IMUZ!==undefined) $('valImuZ').textContent = parseFloat(fields.IMUZ).toFixed(2);
 
+  if(fields.LAT!==undefined && fields.LON!==undefined){
+    const rLat = parseFloat(fields.LAT);
+    const rLon = parseFloat(fields.LON);
+    if(!isNaN(rLat) && !isNaN(rLon)){
+      state.roverLat = rLat;
+      state.roverLon = rLon;
+      $('valRoverGps').textContent = `${rLat.toFixed(6)}, ${rLon.toFixed(6)}`;
+      updateNavDistance();
+    }
+  }
+
   if(fields.RSSI!==undefined){ $('valRssi').textContent = fields.RSSI+' dBm'; $('heroRssi').textContent = fields.RSSI+' dBm'; }
   if(fields.ESP32M!==undefined) $('infoEsp32M').textContent = fields.ESP32M;
   if(fields.ESP32S!==undefined) $('infoEsp32S').textContent = fields.ESP32S;
@@ -1187,6 +1244,12 @@ function handleIncoming(raw){
       $('btnAuto').classList.toggle('active', m==='AUTO');
       $('btnManual').classList.toggle('active', m==='MANUAL');
       $('modeIndicator').textContent = m;
+      const navBadge = $('navBadgeMode');
+      if(navBadge){
+        navBadge.textContent = m === 'AUTO' ? '🤖 MODO AUTO ACTIVO' : '🎮 MODO MANUAL';
+        navBadge.style.color = m === 'AUTO' ? 'var(--green)' : 'var(--text-dim)';
+        navBadge.style.borderColor = m === 'AUTO' ? 'var(--green)' : 'var(--line)';
+      }
     }
   }
 
@@ -1260,25 +1323,43 @@ function renderDigiCard(s, on, prev){
 ============================================================ */
 function renderAlerts(){
   const alerts = [];
+
+  // 1. Estado de enlace LoRa con el Rover (Radiofrecuencia)
+  if(!isDemoMode && !state.loraOk){
+    if(state.lastPacketTime){
+      alerts.push('Red LoRa: Sin señal del Rover (Pérdida de enlace)');
+    } else {
+      alerts.push('Red LoRa: Desconectada (Esperando comunicación del Rover)');
+    }
+  }
+
+  // 2. Estado de conexión MQTT (Internet / Broker HiveMQ)
+  if(!isDemoMode && !state.mqttConnected){
+    alerts.push('Broker MQTT: Desconectado de Internet');
+  }
+
+  // 3. Nivel de batería
   const battV = state.values[BATTERY.id];
   if(battV !== undefined && battV <= BATTERY.warn){
     alerts.push(battV <= BATTERY.min ? `Batería crítica (${battV.toFixed(2)} V)` : `Batería baja (${battV.toFixed(2)} V)`);
   }
+
+  // 4. Sensores fuera de rango
   CORRIENTES.concat(ENCODERS_ABS).forEach(s=>{
     const v = state.values[s.id];
     if(v!==undefined && (v<s.min || v>s.max)) alerts.push(`${s.label} fuera de rango (${v.toFixed(2)} ${s.unit})`);
   });
-  if(!state.mqttConnected && !isDemoMode) alerts.push('MQTT desconectado');
-  if(!state.loraOk && state.lastPacketTime && !isDemoMode) alerts.push('Pérdida de comunicación LoRa');
+
+  // 5. Señal RSSI
   const rssiNum = parseFloat($('valRssi').textContent);
-  if(!isNaN(rssiNum) && rssiNum < RSSI_LOW_THRESHOLD) alerts.push(`RSSI bajo (${rssiNum} dBm)`);
+  if(!isNaN(rssiNum) && rssiNum < RSSI_LOW_THRESHOLD) alerts.push(`RSSI LoRa bajo (${rssiNum} dBm)`);
 
   const banner = $('alertBanner');
   if(alerts.length===0){
     banner.classList.remove('show');
   } else {
     banner.classList.add('show');
-    $('alertBannerText').innerHTML = `<b>${alerts.length} alerta(s)</b> — ${alerts[0]}${alerts.length>1?' y '+(alerts.length-1)+' más':''}`;
+    $('alertBannerText').innerHTML = `<b>${alerts.length} alerta(s)</b> — ${alerts.join(' &nbsp;·&nbsp; ')}`;
   }
 }
 
@@ -1406,10 +1487,14 @@ function publishCmd(mensaje, dir){
   }
 
   if(!client || !client.connected){
-    showToast('MQTT no está conectado', 'err');
-    confirmEl.textContent = 'Sin conexión';
+    showToast('Broker MQTT no conectado a Internet', 'err');
+    confirmEl.textContent = 'Sin conexión MQTT';
     confirmEl.className = 'ack-fail';
     return;
+  }
+
+  if(!state.loraOk && !isDemoMode){
+    showToast('Aviso: Red LoRa desconectada del Rover. El comando se envió al gateway.', 'warn');
   }
 
   client.publish(cfg.topicComando, payload, {qos:1, retain:false}, function(err){
@@ -1456,7 +1541,117 @@ function setMode(mode){
   $('btnAuto').classList.toggle('active', mode==='AUTO');
   $('btnManual').classList.toggle('active', mode==='MANUAL');
   $('modeIndicator').textContent = mode;
+  const navBadge = $('navBadgeMode');
+  if(navBadge){
+    navBadge.textContent = mode === 'AUTO' ? '🤖 MODO AUTO ACTIVO' : '🎮 MODO MANUAL';
+    navBadge.style.color = mode === 'AUTO' ? 'var(--green)' : 'var(--text-dim)';
+    navBadge.style.borderColor = mode === 'AUTO' ? 'var(--green)' : 'var(--line)';
+  }
   publishCmd('MODO=' + mode, 'MODO='+mode);
+}
+
+/* ============================================================
+   CONTROL AUTOMÁTICO: COORDENADAS GPS (LATITUD Y LONGITUD)
+============================================================ */
+function sendAutoCoords(){
+  const latStr = $('inputLat').value.trim();
+  const lonStr = $('inputLon').value.trim();
+  if(!latStr || !lonStr){
+    showToast('Ingresa tanto la Latitud como la Longitud', 'err');
+    return;
+  }
+  const lat = parseFloat(latStr);
+  const lon = parseFloat(lonStr);
+  if(isNaN(lat) || lat < -90 || lat > 90){
+    showToast('Latitud inválida (-90° a +90°)', 'err');
+    return;
+  }
+  if(isNaN(lon) || lon < -180 || lon > 180){
+    showToast('Longitud inválida (-180° a +180°)', 'err');
+    return;
+  }
+
+  state.targetLat = lat;
+  state.targetLon = lon;
+  localStorage.setItem('rover_target_lat', lat.toString());
+  localStorage.setItem('rover_target_lon', lon.toString());
+
+  $('valDestCoords').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  updateNavDistance();
+
+  // Asegurar que el rover esté en modo AUTO
+  if(state.mode !== 'AUTO'){
+    state.mode = 'AUTO';
+    $('btnAuto').classList.add('active');
+    $('btnManual').classList.remove('active');
+    $('modeIndicator').textContent = 'AUTO';
+    const navBadge = $('navBadgeMode');
+    if(navBadge){
+      navBadge.textContent = '🤖 MODO AUTO ACTIVO';
+      navBadge.style.color = 'var(--green)';
+      navBadge.style.borderColor = 'var(--green)';
+    }
+  }
+
+  const cmd = `NAV_AUTO|LAT=${lat.toFixed(6)}|LON=${lon.toFixed(6)}`;
+  publishCmd(cmd, `AUTO -> LAT:${lat.toFixed(4)} LON:${lon.toFixed(4)}`);
+  showToast(`Destino fijado: ${lat.toFixed(5)}, ${lon.toFixed(5)}`, 'ok');
+  flashButton($('btnSendAutoCoords'));
+}
+
+function fillMyGps(){
+  if(!navigator.geolocation){
+    showToast('Geolocalización no soportada en este navegador', 'err');
+    return;
+  }
+  showToast('Obteniendo posición GPS del dispositivo...', 'info');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      $('inputLat').value = lat.toFixed(6);
+      $('inputLon').value = lon.toFixed(6);
+      showToast(`GPS obtenido: ${lat.toFixed(4)}, ${lon.toFixed(4)}`, 'ok');
+      flashButton($('btnGetMyGps'));
+    },
+    err => {
+      showToast('Error GPS: ' + err.message, 'err');
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  );
+}
+
+function clearAutoCoords(){
+  $('inputLat').value = '';
+  $('inputLon').value = '';
+  state.targetLat = null;
+  state.targetLon = null;
+  localStorage.removeItem('rover_target_lat');
+  localStorage.removeItem('rover_target_lon');
+  $('valDestCoords').textContent = '—';
+  $('valDistTarget').textContent = '—';
+  showToast('Coordenadas de destino borradas', 'info');
+  flashButton($('btnClearAutoCoords'));
+}
+
+function updateNavDistance(){
+  if(state.targetLat === null || state.targetLon === null || state.roverLat === null || state.roverLon === null){
+    $('valDistTarget').textContent = '—';
+    return;
+  }
+  const R = 6371000; // Radio de la Tierra en metros
+  const dLat = (state.targetLat - state.roverLat) * Math.PI / 180;
+  const dLon = (state.targetLon - state.roverLon) * Math.PI / 180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(state.roverLat*Math.PI/180) * Math.cos(state.targetLat*Math.PI/180) *
+            Math.sin(dLon/2)*Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c;
+  if(d < 1000){
+    $('valDistTarget').textContent = d.toFixed(1) + ' m';
+  } else {
+    $('valDistTarget').textContent = (d/1000).toFixed(2) + ' km';
+  }
 }
 
 function flashButton(el){
@@ -1644,6 +1839,20 @@ function generateSyntheticTelemetry(){
   parts.push(`ESTADO=${state.heldDir || 'DETENIDO'}`);
   parts.push(`MODO=${state.mode || 'MANUAL'}`);
 
+  // Simulación de GPS
+  if(state.targetLat !== null && state.targetLon !== null){
+    if(state.roverLat === null){ state.roverLat = state.targetLat + 0.0012; state.roverLon = state.targetLon - 0.0015; }
+    if(isMoving || state.mode === 'AUTO'){
+      state.roverLat += (state.targetLat - state.roverLat) * 0.04;
+      state.roverLon += (state.targetLon - state.roverLon) * 0.04;
+    }
+    parts.push(`LAT=${state.roverLat.toFixed(6)}`);
+    parts.push(`LON=${state.roverLon.toFixed(6)}`);
+  } else {
+    parts.push(`LAT=4.609710`);
+    parts.push(`LON=-74.081750`);
+  }
+
   const payloadNoCrc = parts.join('|');
   const crc = computeChecksum(payloadNoCrc);
   const fullPacket = `${payloadNoCrc}|CRC=${crc}`;
@@ -1654,6 +1863,21 @@ function generateSyntheticTelemetry(){
 /* ============================================================
    INIT
 ============================================================ */
+// Restaurar coordenadas guardadas si existen
+const savedLat = localStorage.getItem('rover_target_lat');
+const savedLon = localStorage.getItem('rover_target_lon');
+if(savedLat && savedLon){
+  const lat = parseFloat(savedLat);
+  const lon = parseFloat(savedLon);
+  if(!isNaN(lat) && !isNaN(lon)){
+    state.targetLat = lat;
+    state.targetLon = lon;
+    $('inputLat').value = lat;
+    $('inputLon').value = lon;
+    $('valDestCoords').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  }
+}
+
 applyConfigToUI();
 redrawMainChart();
 renderAlerts();
