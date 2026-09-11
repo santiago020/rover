@@ -33,8 +33,91 @@ float targetLat = 0.0;
 float targetLon = 0.0;
 bool  targetDefinido = false;
 
+// Coordenadas Home (Base de retorno reescribible)
+float homeLat = 0.0;
+float homeLon = 0.0;
+bool  homeDefinido = false;
+
+// ============================================================
+//         CONFIGURACIÓN DE SEGURIDAD ANTI-VUELCO
+// ============================================================
+const float UMBRAL_VUELCO_GRADOS = 35.0f;       // Inclinación máxima permitida (> 35°)
+const unsigned long TIEMPO_VUELCO_MS = 300;     // Duración continua para disparar corte (> 300 ms)
+
+float actualImuX = 0.0f;
+float actualImuY = 0.0f;
+float actualImuZ = 0.98f;
+float inclinacionActual = 0.0f;
+float pitchActual = 0.0f;
+float rollActual = 0.0f;
+
+bool inclinacionPeligrosa = false;
+unsigned long inicioPeligroVuelco = 0;
+bool emergenciaVuelcoActiva = false;
+
 unsigned long ultimoEnvioSensores = 0;
 const unsigned long intervaloTelemetria = 1500; // Envío cada 1.5 segundos
+
+// ============================================================
+//         CONTROL DE MOTORES Y CORTE DE SEGURIDAD
+// ============================================================
+void detenerMotores() {
+  /* --------------------------------------------------------
+     AQUÍ SE CORTAN LOS PINES FÍSICOS DE TUS MOTORES (PWM = 0)
+     ej: analogWrite(PIN_PWM_IZQ, 0); analogWrite(PIN_PWM_DER, 0);
+     -------------------------------------------------------- */
+  estadoRover = "DETENIDO";
+}
+
+void actualizarInclinacionIMU(float ax, float ay, float az) {
+  actualImuX = ax;
+  actualImuY = ay;
+  actualImuZ = az;
+
+  // Roll: inclinación lateral (Y vs Z)
+  float rollRad = atan2(ay, az);
+  rollActual = rollRad * (180.0f / 3.14159265f);
+
+  // Pitch: inclinación longitudinal (X vs plano YZ)
+  float pitchRad = atan2(-ax, sqrt(ay * ay + az * az));
+  pitchActual = pitchRad * (180.0f / 3.14159265f);
+
+  // Inclinación combinada
+  inclinacionActual = sqrt(pitchActual * pitchActual + rollActual * rollActual);
+
+  // Seguridad Anti-Vuelco: Inclinación > 35° sostenida por más de 300 ms continuos
+  if (inclinacionActual > UMBRAL_VUELCO_GRADOS) {
+    if (!inclinacionPeligrosa) {
+      inclinacionPeligrosa = true;
+      inicioPeligroVuelco = millis();
+    } else if (millis() - inicioPeligroVuelco >= TIEMPO_VUELCO_MS) {
+      if (!emergenciaVuelcoActiva) {
+        emergenciaVuelcoActiva = true;
+        detenerMotores();
+        estadoRover = "EMERGENCIA_VUELCO";
+
+        Serial.println();
+        Serial.println("**************************************************");
+        Serial.println("¡¡¡ALERTA CRÍTICA: PARADA DE EMERGENCIA POR VUELCO!!!");
+        Serial.print("Inclinación crítica: ");
+        Serial.print(inclinacionActual, 1);
+        Serial.print("° (> 35°) sostenida por ");
+        Serial.print(millis() - inicioPeligroVuelco);
+        Serial.println(" ms.");
+        Serial.println("MOTORES CORTADOS INMEDIATAMENTE POR EL ESP32.");
+        Serial.println("**************************************************");
+      }
+    }
+  } else {
+    // Si la inclinación se normaliza por debajo de 25° (histeresis de 10°)
+    inclinacionPeligrosa = false;
+    if (emergenciaVuelcoActiva && inclinacionActual < 25.0f) {
+      emergenciaVuelcoActiva = false;
+      estadoRover = "DETENIDO";
+      Serial.println("Rover recuperó estabilidad (< 25°). Parada de emergencia rearmada.");
+    }
+  }
+}
 
 // ============================================================
 //                     CÁLCULO DE CRC (MOD 256)
@@ -95,6 +178,24 @@ void procesarComando(const String& raw) {
     cmd = raw;
   }
 
+  // 0. Seguridad: Si la parada de emergencia por vuelco está activa
+  if (emergenciaVuelcoActiva) {
+    if (cmd == "STOP" || cmd == "RESET_VUELCO") {
+      detenerMotores();
+      if (inclinacionActual < UMBRAL_VUELCO_GRADOS) {
+        emergenciaVuelcoActiva = false;
+        Serial.println("Parada de emergencia restablecida manualmente.");
+      }
+      responderACK(id, true);
+      return;
+    }
+    if (cmd == "ADELANTE" || cmd == "ATRAS" || cmd == "IZQUIERDA" || cmd == "DERECHA" || cmd.startsWith("NAV_AUTO") || cmd == "RTL") {
+      Serial.println("Comando RECHAZADO: Parada de emergencia por vuelco (>35°) activa.");
+      responderACK(id, false, "bloqueo_vuelco_critico");
+      return;
+    }
+  }
+
   // 1. Comando de Cambio de Modo (MODO=AUTO o MODO=MANUAL)
   if (cmd.startsWith("MODO=")) {
     String nuevoModo = cmd.substring(5);
@@ -133,23 +234,65 @@ void procesarComando(const String& raw) {
     return;
   }
 
-  // 2. Comandos de Movimiento
+  // 3. Fijar o Reescribir Punto Home (SET_HOME|LAT=...|LON=...)
+  if (cmd.startsWith("SET_HOME") || raw.indexOf("SET_HOME") != -1) {
+    String latStr = extraerCampo(raw, "LAT");
+    String lonStr = extraerCampo(raw, "LON");
+    if (latStr.length() > 0 && lonStr.length() > 0) {
+      homeLat = latStr.toFloat();
+      homeLon = lonStr.toFloat();
+      homeDefinido = true;
+      Serial.print("PUNTO HOME ACTUALIZADO/REESCRITO -> Lat: ");
+      Serial.print(homeLat, 6);
+      Serial.print(" | Lon: ");
+      Serial.println(homeLon, 6);
+      responderACK(id, true);
+    } else {
+      responderACK(id, false, "coordenadas_home_invalidas");
+    }
+    return;
+  }
+
+  // 4. Regreso a Home (RTL / VOLVER_HOME)
+  if (cmd == "RTL" || cmd == "VOLVER_HOME" || cmd.startsWith("RTL")) {
+    if (homeDefinido) {
+      modoRover = "AUTO";
+      targetLat = homeLat;
+      targetLon = homeLon;
+      targetDefinido = true;
+      Serial.print("RTL ACTIVADO: Regresando a Home -> Lat: ");
+      Serial.print(homeLat, 6);
+      Serial.print(" | Lon: ");
+      Serial.println(homeLon, 6);
+      responderACK(id, true);
+    } else {
+      Serial.println("RTL RECHAZADO: Punto Home no ha sido configurado.");
+      responderACK(id, false, "home_no_definido");
+    }
+    return;
+  }
+
+  // 5. Comandos de Movimiento Manual
   if (cmd == "ADELANTE" || cmd == "ATRAS" || cmd == "IZQUIERDA" || cmd == "DERECHA" || cmd == "STOP") {
-    estadoRover = (cmd == "STOP") ? "DETENIDO" : cmd;
+    if (cmd == "STOP") {
+      detenerMotores();
+    } else {
+      estadoRover = cmd;
+    }
     Serial.print("Estado de movimiento actualizado a: ");
     Serial.println(estadoRover);
 
     /* --------------------------------------------------------
        AQUÍ SE ACCIONAN LOS PINES FÍSICOS DE TUS MOTORES:
        ej: if (estadoRover == "ADELANTE") moverAdelante();
-           else if (estadoRover == "STOP") frenarMotores();
+           else if (estadoRover == "STOP") detenerMotores();
        -------------------------------------------------------- */
 
     responderACK(id, true);
     return;
   }
 
-  // 3. Comando personalizado / Desconocido
+  // 6. Comando personalizado / Desconocido
   Serial.print("Comando personalizado ejecutado: ");
   Serial.println(cmd);
   responderACK(id, true);
@@ -159,7 +302,7 @@ void procesarComando(const String& raw) {
 //                     CONSTRUIR Y ENVIAR TELEMETRÍA
 // ============================================================
 void enviarTelemetria() {
-  bool enMovimiento = (estadoRover != "DETENIDO");
+  bool enMovimiento = (estadoRover != "DETENIDO" && estadoRover != "EMERGENCIA_VUELCO");
 
   // Simulación dinámica de descarga leve de batería y corrientes
   if (enMovimiento) {
@@ -192,13 +335,18 @@ void enviarTelemetria() {
     paquete += "|EI" + String(i) + "=" + String(valDig);
   }
 
-  // IMU (X, Y, Z)
-  float imuX = enMovimiento ? ((float)random(-35, 35) / 100.0f) : 0.02;
-  float imuY = enMovimiento ? ((float)random(-25, 25) / 100.0f) : -0.01;
-  float imuZ = 0.98 + ((float)random(-3, 3) / 100.0f);
-  paquete += "|IMUX=" + String(imuX, 2);
-  paquete += "|IMUY=" + String(imuY, 2);
-  paquete += "|IMUZ=" + String(imuZ, 2);
+  // IMU (X, Y, Z) y Seguridad
+  paquete += "|IMUX=" + String(actualImuX, 2);
+  paquete += "|IMUY=" + String(actualImuY, 2);
+  paquete += "|IMUZ=" + String(actualImuZ, 2);
+  paquete += "|TILT=" + String(inclinacionActual, 1);
+  if (emergenciaVuelcoActiva) {
+    paquete += "|VUELCO=1";
+  }
+  if (homeDefinido) {
+    paquete += "|HLAT=" + String(homeLat, 6);
+    paquete += "|HLON=" + String(homeLon, 6);
+  }
 
   // Diagnóstico del sistema
   paquete += "|ESP32M=OK";
@@ -263,7 +411,15 @@ void setup() {
 //                     LOOP
 // ============================================================
 void loop() {
-  // 1. Recibir y procesar comandos de forma inmediata
+  // 1. Monitoreo constante de inclinación IMU y seguridad anti-vuelco (> 35° por > 300 ms)
+  // (Si tienes sensor MPU6050/BNO055 conectado por I2C, se lee aquí. Por ahora simulación dinámica)
+  bool enMovimiento = (estadoRover != "DETENIDO" && estadoRover != "EMERGENCIA_VUELCO");
+  float ruidoX = enMovimiento ? ((float)random(-35, 35) / 100.0f) : 0.02f;
+  float ruidoY = enMovimiento ? ((float)random(-25, 25) / 100.0f) : -0.01f;
+  float ruidoZ = 0.98f + ((float)random(-3, 3) / 100.0f);
+  actualizarInclinacionIMU(ruidoX, ruidoY, ruidoZ);
+
+  // 2. Recibir y procesar comandos de forma inmediata
   if (rf95.available()) {
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
@@ -277,7 +433,7 @@ void loop() {
     }
   }
 
-  // 2. Enviar telemetría periódica
+  // 3. Enviar telemetría periódica
   if (millis() - ultimoEnvioSensores >= intervaloTelemetria) {
     ultimoEnvioSensores = millis();
     enviarTelemetria();
