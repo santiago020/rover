@@ -26,6 +26,13 @@ String estadoRover  = "DETENIDO";  // "DETENIDO", "ADELANTE", "ATRAS", etc.
 float  voltajeBateria = 12.45;     // Voltaje (puede leerse de un divisor en pin ADC)
 float  anguloSimulado = 45.0;
 
+// Coordenadas GPS del Rover y destino en modo AUTO
+float latRover = 4.609710;
+float lonRover = -74.081750;
+float targetLat = 0.0;
+float targetLon = 0.0;
+bool  targetDefinido = false;
+
 unsigned long ultimoEnvioSensores = 0;
 const unsigned long intervaloTelemetria = 1500; // Envío cada 1.5 segundos
 
@@ -103,6 +110,29 @@ void procesarComando(const String& raw) {
     return;
   }
 
+  // 2. Coordenadas de Navegación Automática (NAV_AUTO|LAT=...|LON=... o GOTO)
+  if (cmd.startsWith("NAV_AUTO") || cmd.startsWith("GOTO") || raw.indexOf("LAT=") != -1) {
+    modoRover = "AUTO"; // Sincroniza al rover en modo autónomo
+    String latStr = extraerCampo(raw, "LAT");
+    String lonStr = extraerCampo(raw, "LON");
+    if (latStr.length() > 0 && lonStr.length() > 0) {
+      targetLat = latStr.toFloat();
+      targetLon = lonStr.toFloat();
+      targetDefinido = true;
+      Serial.print("NUEVO DESTINO GPS RECIBIDO -> Lat: ");
+      Serial.print(targetLat, 6);
+      Serial.print(" | Lon: ");
+      Serial.println(targetLon, 6);
+
+      /* --------------------------------------------------------
+         AQUÍ TU ALGORITMO AUTÓNOMO PUEDE CALCULAR EL RUMBO:
+         ej: calcularRumboHaciaDestino(targetLat, targetLon);
+         -------------------------------------------------------- */
+    }
+    responderACK(id, true);
+    return;
+  }
+
   // 2. Comandos de Movimiento
   if (cmd == "ADELANTE" || cmd == "ATRAS" || cmd == "IZQUIERDA" || cmd == "DERECHA" || cmd == "STOP") {
     estadoRover = (cmd == "STOP") ? "DETENIDO" : cmd;
@@ -175,6 +205,8 @@ void enviarTelemetria() {
   paquete += "|ESP32S=OK";
   paquete += "|ESTADO=" + estadoRover;
   paquete += "|MODO=" + modoRover; // ¡Sincroniza a todos los navegadores!
+  paquete += "|LAT=" + String(latRover, 6);
+  paquete += "|LON=" + String(lonRover, 6);
 
   // Calcular Checksum CRC mod 256
   uint8_t crc = calcularCRC(paquete);
